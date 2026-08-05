@@ -140,7 +140,7 @@ function render() {
   updateBar();
 }
 
-const BRAND = "PARISA'S&nbsp;PERFUME&nbsp;NIGHT";
+const BRAND = "SMELL&nbsp;THINGS";
 
 function updateBar() {
   if (state.phase === 'lobby') {
@@ -180,7 +180,7 @@ function renderJoinForm() {
   setBar(BRAND, esc(code));
   app.innerHTML = `
     <div class="narrow join">
-      <p class="eyebrow">You are invited</p>
+      <p class="eyebrow">You are invited to</p>
       <h1 class="title">${esc(gameInfo?.title ?? '')}</h1>
       <form id="join" novalidate>
         ${nameFieldHtml('name', 'Display name')}

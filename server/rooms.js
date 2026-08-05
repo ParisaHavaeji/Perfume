@@ -38,7 +38,7 @@ export function getRoom(code) {
 }
 
 // Every game is the same occasion, so rooms all share one title.
-export const GAME_TITLE = "Parisa's Perfume Night";
+export const GAME_TITLE = "Smell Things";
 
 export function createRoom() {
   let code;

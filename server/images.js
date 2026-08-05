@@ -89,26 +89,40 @@ function findPageImage(html) {
 }
 
 async function download(id, entry) {
-  let imageSrc;
+  const candidates = [];
   if (entry.fid != null) {
-    imageSrc = `https://fimgs.net/mdimg/perfume/375x500.${entry.fid}.jpg`;
+    candidates.push(`https://fimgs.net/mdimg/perfume/375x500.${entry.fid}.jpg`);
   } else if (entry.url) {
     const page = await fetchWithTimeout(entry.url, 'text/html');
-    imageSrc = findPageImage(await page.text());
-    if (!imageSrc) throw new Error(`no page image at ${entry.url}`);
-    imageSrc = new URL(imageSrc, entry.url).href;
+    const found = findPageImage(await page.text());
+    if (!found) throw new Error(`no page image at ${entry.url}`);
+    const src = new URL(found, entry.url).href;
+    // Parfumo's og:image is a watermarked 1200x630 social card; the same photo
+    // is served clean under /perfumes/. Prefer it, fall back to the card.
+    if (src.includes('/perfume_social/')) {
+      candidates.push(src.replace('/perfume_social/', '/perfumes/').split('?')[0]);
+    }
+    candidates.push(src);
   } else {
     throw new Error('entry has neither fid nor url');
   }
 
-  const res = await fetchWithTimeout(imageSrc, 'image/*');
-  const type = (res.headers.get('content-type') ?? '').split(';')[0].trim();
-  const ext = EXT_BY_TYPE[type];
-  if (!ext) throw new Error(`unexpected content-type ${type} for ${imageSrc}`);
-  const body = Buffer.from(await res.arrayBuffer());
-  if (body.length === 0 || body.length > MAX_IMAGE_BYTES) throw new Error(`bad image size ${body.length}`);
-  await writeFile(path.join(CACHE_DIR, `${id}${ext}`), body);
-  return ext;
+  let lastError;
+  for (const imageSrc of candidates) {
+    try {
+      const res = await fetchWithTimeout(imageSrc, 'image/*');
+      const type = (res.headers.get('content-type') ?? '').split(';')[0].trim();
+      const ext = EXT_BY_TYPE[type];
+      if (!ext) throw new Error(`unexpected content-type ${type} for ${imageSrc}`);
+      const body = Buffer.from(await res.arrayBuffer());
+      if (body.length === 0 || body.length > MAX_IMAGE_BYTES) throw new Error(`bad image size ${body.length}`);
+      await writeFile(path.join(CACHE_DIR, `${id}${ext}`), body);
+      return ext;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
 }
 
 /**

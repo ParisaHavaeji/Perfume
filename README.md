@@ -1,4 +1,4 @@
-# Parisa's Perfume Night
+# Smell Things
 
 The host lines up perfumes, guests join from their phones through a link, everyone smells the same bottle, and then everyone guesses which notes are actually in it. Right answers score 10 points, wrong ones cost 10. Each round ends with a reveal and a ranking, and the night ends with a winner.
 
