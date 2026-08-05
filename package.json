@@ -1,0 +1,16 @@
+{
+  "name": "nose-game",
+  "version": "1.0.0",
+  "description": "Multiplayer perfume note guessing game",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

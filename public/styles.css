@@ -1,0 +1,265 @@
+/* Design system: HELIOT EMIL monochrome (see plan.md).
+   Measured from heliotemil.com: Helvetica Now Text (fallback Helvetica/Arial),
+   font-weight 400 only, exactly two sizes — 10px/14px base and 14px accents —
+   uppercase with NORMAL letter-spacing, hairlines #c3c3c3, inactive gray
+   #c3c3c3, 15px page gutters, no rounded corners, no shadows, no color.
+   Deliberately light-only, like the reference site — no dark mode. */
+
+:root {
+  --bg: #ffffff;
+  --ink: #000000;
+  --faint: #c3c3c3;     /* hairlines AND inactive text — one gray, like the site */
+  --panel: #fafafa;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Helvetica Now Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 400;
+  text-transform: uppercase;
+  font-feature-settings: "tnum";
+}
+button { font: inherit; text-transform: inherit; border-radius: 0; }
+a { color: inherit; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* The accent size — the only other size in the system. */
+.title, .round-name, .reveal-name, .winner-name { font-size: 14px; line-height: 18px; font-weight: 400; }
+
+/* ---------- chrome ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 10px 15px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--faint);
+  white-space: nowrap;
+}
+.topbar .dim { color: var(--faint); overflow: hidden; text-overflow: ellipsis; }
+
+main { padding: 0 15px 80px; }
+.narrow { max-width: 420px; margin: 0 auto; }
+.wide { max-width: 1080px; margin: 0 auto; }
+
+.eyebrow, .field label, .list-head, .result .add, .tier h4, .verdict-group h5,
+.ranking caption, .ranking th, .hostbar .stat, .locked-note, .spectate-note {
+  color: var(--faint);
+}
+
+.eyebrow { margin: 0 0 6px; }
+.centered { text-align: center; }
+
+h1.title { margin: 0 0 10px; text-wrap: balance; }
+.sub { color: var(--faint); margin: 0 0 30px; }
+
+/* ---------- controls ---------- */
+.field { text-align: left; margin-bottom: 24px; }
+.field label { display: block; margin-bottom: 6px; }
+.field input {
+  width: 100%; border: none; border-bottom: 1px solid var(--faint);
+  background: transparent; color: var(--ink);
+  font: inherit; text-transform: inherit; padding: 6px 0 4px; border-radius: 0;
+}
+.field input:focus { outline: none; border-bottom-color: var(--ink); }
+/* Inline validation — replaces the browser bubble (forms are novalidate). */
+.field .err { display: none; margin: 6px 0 0; color: var(--ink); }
+.field.invalid .err { display: block; }
+.field.invalid input { border-bottom-color: var(--ink); }
+
+.btn, .ghost { display: inline-block; cursor: pointer; }
+.btn {
+  border: 1px solid var(--ink);
+  background: var(--bg); color: var(--ink);
+  padding: 11px 16px;
+}
+.btn:hover { background: var(--ink); color: var(--bg); }
+.btn:disabled { background: var(--bg); border-color: var(--faint); color: var(--faint); cursor: default; }
+.btn.block { width: 100%; }
+.ghost { background: none; border: none; padding: 11px 0; color: var(--ink); }
+.ghost:hover { text-decoration: underline; }
+.btn:focus-visible, .ghost:focus-visible, .chip:focus-visible, .switch:focus-visible {
+  outline: 1px solid var(--ink); outline-offset: 2px;
+}
+
+/* Text toggle — "ON / OFF", active word black, inactive gray. */
+.switch { background: none; border: none; padding: 0; cursor: pointer; color: var(--faint); }
+.switch[aria-checked="true"] .w-on, .switch[aria-checked="false"] .w-off { color: var(--ink); }
+
+.toggle-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+  padding: 14px 0; border-bottom: 1px solid var(--faint);
+}
+.toggle-row .sub { color: var(--faint); margin: 3px 0 0; }
+
+/* ---------- join / lobby ---------- */
+/* Centered on the screen, both axes; the 150px offsets the topbar and keeps
+   the block sitting a touch above true center. */
+.join {
+  min-height: calc(100vh - 150px);
+  min-height: calc(100dvh - 150px);
+  display: flex; flex-direction: column; justify-content: center;
+  text-align: center;
+}
+.join .field, .join .cta { margin-top: 34px; }
+.waiting { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--faint); color: var(--faint); text-align: left; }
+.waiting ul { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.waiting li { color: var(--ink); }
+.waiting li.off { color: var(--faint); }
+
+/* ---------- host console ---------- */
+.host-grid { display: flex; flex-direction: column; gap: 44px; padding-top: 36px; max-width: 680px; margin: 0 auto; }
+
+.search-box { border-bottom: 1px solid var(--faint); padding-bottom: 7px; }
+.search-box:focus-within { border-bottom-color: var(--ink); }
+.search-box input {
+  width: 100%; border: none; background: transparent; color: var(--ink);
+  font: inherit; text-transform: inherit; padding: 4px 0; min-width: 0;
+}
+.search-box input:focus { outline: none; }
+.search-box input::placeholder { color: var(--faint); }
+
+.results { border-bottom: 1px solid var(--faint); margin-bottom: 30px; max-height: 300px; overflow-y: auto; }
+.result {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
+  width: 100%; text-align: left; background: none; border: none; color: var(--ink);
+  padding: 10px 0; border-bottom: 1px solid var(--faint); cursor: pointer;
+}
+.result:last-child { border-bottom: none; }
+.result:hover, .result:focus-visible { background: var(--panel); outline: none; }
+.result .brand { color: var(--faint); }
+.result .add { white-space: nowrap; }
+.result:hover .add { color: var(--ink); }
+
+.list-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding-bottom: 8px; border-bottom: 1px solid var(--faint);
+}
+.queue-head { margin-top: 30px; }
+.queue-empty { margin-top: 12px; }
+.hostname-form .field { margin-top: 18px; }
+.queue-item {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--faint);
+}
+.queue-item .idx { color: var(--faint); min-width: 2em; }
+.queue-item .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.queue-item .name .brand { color: var(--faint); }
+.queue-item.played .name { color: var(--faint); text-decoration: line-through; text-decoration-thickness: 1px; }
+.queue-item .tag { color: var(--faint); white-space: nowrap; }
+.queue-item .x {
+  background: none; border: none; color: var(--faint); cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 0 2px;
+}
+.queue-item .x:hover { color: var(--ink); }
+
+.host-actions { display: flex; gap: 20px; align-items: center; margin-top: 26px; flex-wrap: wrap; }
+
+/* host control strip during rounds */
+.hostbar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+  display: flex; justify-content: center; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 10px 15px;
+  background: var(--bg); border-top: 1px solid var(--faint);
+}
+.hostbar[hidden] { display: none; } /* display:flex would otherwise beat the hidden attribute */
+body.has-hostbar main { padding-bottom: 140px; }
+/* Names of players who haven't locked in yet; offline ones stay gray. */
+.hostbar .who { color: var(--ink); }
+.hostbar .who.off { color: var(--faint); }
+
+/* ---------- round ---------- */
+.round { padding-top: 40px; }
+.round-name { margin: 0 0 4px; text-wrap: balance; text-align: center; }
+.round-sub { color: var(--faint); margin: 0 0 36px; text-align: center; }
+
+/* Columns collapse to a stack on narrow screens; the count comes from the
+   markup via --cols, so any tier count works without new CSS. */
+.pyramid { display: grid; grid-template-columns: 1fr; border-top: 1px solid var(--faint); }
+@media (min-width: 700px) {
+  .pyramid:not([data-cols="1"]) { grid-template-columns: repeat(var(--cols), 1fr); }
+  .pyramid:not([data-cols="1"]) .tier { padding: 20px 20px 28px; }
+  .pyramid:not([data-cols="1"]) .tier + .tier { border-top: none; }
+  .pyramid:not([data-cols="1"]) .tier:first-child { padding-left: 0; }
+  .pyramid:not([data-cols="1"]) .tier:last-child { padding-right: 0; }
+}
+.tier { padding: 16px 0 24px; }
+.tier + .tier { border-top: 1px solid var(--faint); }
+.tier h4 { font-weight: 400; margin: 0 0 14px; }
+.chips, .vchips { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.chip {
+  border: none; background: none; color: var(--ink);
+  padding: 6px 8px; margin: 0 -2px; cursor: pointer;
+}
+.chip:hover { text-decoration: underline; }
+/* The one inversion: picked chips, real notes (spectator), and hits (reveal). */
+.chip[aria-pressed="true"], .chip.real, .v.hit { background: var(--ink); color: var(--bg); }
+.chip[aria-pressed="true"] { text-decoration: none; }
+.chip:disabled { cursor: default; }
+.chip.real, .chip.dim { pointer-events: none; }
+.chip.dim { color: var(--faint); }
+
+.round-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  border-top: 1px solid var(--faint); padding-top: 16px; flex-wrap: wrap;
+}
+.round-foot .picked { color: var(--faint); }
+@media (max-width: 520px) {
+  .round-foot { flex-direction: column; align-items: stretch; text-align: center; gap: 12px; }
+}
+.spectate-note { text-align: center; margin: 0 0 26px; }
+.spectate-bottle { margin: 24px 0; }
+.locked-note { text-align: center; padding: 16px 0 0; }
+
+/* ---------- reveal / final ---------- */
+.reveal-center {
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  text-align: center; margin: 40px 0 36px;
+}
+.reveal-name { margin: 0; text-wrap: balance; }
+.bottle { width: min(220px, 60vw); }
+.bottle img { display: block; width: 100%; height: auto; }
+.bottle.noimg {
+  aspect-ratio: 3 / 4;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; text-align: center;
+}
+
+.verdicts { display: flex; flex-direction: column; gap: 26px; max-width: 640px; margin: 0 auto 36px; }
+.verdict-group h5 { font-weight: 400; margin: 0 0 10px; }
+.v { padding: 6px 8px; display: inline-flex; align-items: baseline; gap: 6px; }
+.v .pts { color: var(--faint); }
+.v.hit .pts { color: inherit; opacity: 0.65; }
+.v.miss { color: var(--faint); }
+.v.wrong { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+.ranking { max-width: 640px; margin: 0 auto; overflow-x: auto; }
+.ranking table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.ranking caption { text-align: left; padding-bottom: 8px; }
+.ranking th { text-align: left; font-weight: 400; border-bottom: 1px solid var(--ink); padding: 0 0 6px; }
+.ranking td { padding: 10px 8px 10px 0; border-bottom: 1px solid var(--faint); }
+.ranking td.num, .ranking th.num { text-align: right; padding-right: 0; }
+.ranking .delta { color: var(--faint); }
+
+.winner-block { text-align: center; padding: 70px 0 44px; }
+.final-actions { text-align: center; margin-top: 40px; }
+.winner-name { margin: 8px 0 8px; overflow-wrap: anywhere; }
+.winner-score { color: var(--faint); margin: 0; }
+.score-note { margin: 0; color: var(--ink); }
+
+/* ---------- toast ---------- */
+.toast {
+  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+  z-index: 20; max-width: min(90vw, 480px);
+  background: var(--ink); color: var(--bg);
+  padding: 10px 16px; text-align: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+}
+.toast.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }

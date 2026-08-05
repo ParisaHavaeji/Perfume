@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Parisa's Perfume Night</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar"><span>PARISA'S&nbsp;PERFUME&nbsp;NIGHT</span></header>
+  <main>
+    <div class="narrow join">
+      <p class="eyebrow">New game</p>
+      <h1 class="title">Queue perfumes. Share the link. Guess the notes.</h1>
+      <div class="cta">
+        <button class="btn block" id="create" type="button">Create game</button>
+      </div>
+    </div>
+  </main>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="/common.js"></script>
+  <script>
+    const button = document.getElementById('create');
+    button.addEventListener('click', () => createGameAndGo(button));
+  </script>
+</body>
+</html>
