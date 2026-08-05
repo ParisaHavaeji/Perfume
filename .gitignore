@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+node_modules/
+
+# AI assistant working notes, not part of the published project
+PLAN.md
+.claude/
