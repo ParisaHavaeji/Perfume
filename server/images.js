@@ -3,7 +3,8 @@
 //
 // - Fragrantica entries carry `fid`: the image lives at a known fimgs.net URL.
 // - Parfumo/Luckyscent entries carry `url`: we fetch the page and follow its
-//   og:image.
+//   og:image, falling back to JSON-LD product metadata (Luckyscent's Shopify
+//   pages have no og:image).
 import { createReadStream } from 'node:fs';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -42,11 +43,49 @@ async function fetchWithTimeout(url, accept) {
   return res;
 }
 
-function findOgImage(html) {
-  const m =
+/** An image value in JSON-LD: a URL string, an array of them, or an ImageObject. */
+function ldImageValue(v) {
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) {
+    for (const x of v) {
+      const url = ldImageValue(x);
+      if (url) return url;
+    }
+    return null;
+  }
+  if (v && typeof v === 'object') return ldImageValue(v.url ?? v.contentUrl ?? null);
+  return null;
+}
+
+/** First `image` property in a JSON-LD document (or its @graph / array of nodes). */
+function ldImage(node) {
+  if (Array.isArray(node)) {
+    for (const x of node) {
+      const url = ldImage(x);
+      if (url) return url;
+    }
+    return null;
+  }
+  if (node && typeof node === 'object') {
+    return ldImageValue(node.image ?? null) ?? ldImage(node['@graph'] ?? null);
+  }
+  return null;
+}
+
+function findPageImage(html) {
+  const og =
     html.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
     html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
-  return m ? m[1] : null;
+  if (og) return og[1];
+  for (const m of html.matchAll(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const url = ldImage(JSON.parse(m[1]));
+      if (url) return url;
+    } catch {
+      // malformed JSON-LD block; keep looking
+    }
+  }
+  return null;
 }
 
 async function download(id, entry) {
@@ -55,8 +94,8 @@ async function download(id, entry) {
     imageSrc = `https://fimgs.net/mdimg/perfume/375x500.${entry.fid}.jpg`;
   } else if (entry.url) {
     const page = await fetchWithTimeout(entry.url, 'text/html');
-    imageSrc = findOgImage(await page.text());
-    if (!imageSrc) throw new Error(`no og:image at ${entry.url}`);
+    imageSrc = findPageImage(await page.text());
+    if (!imageSrc) throw new Error(`no page image at ${entry.url}`);
     imageSrc = new URL(imageSrc, entry.url).href;
   } else {
     throw new Error('entry has neither fid nor url');
