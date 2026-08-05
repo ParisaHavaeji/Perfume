@@ -263,7 +263,7 @@ function hostConsoleView() {
             <div>Hide perfume names</div>
             <p class="sub">Players see "Perfume #1". You always see the real name.</p>
           </div>
-          <button class="switch" id="opt-hide" role="switch" aria-checked="true" aria-label="Hide perfume names">${switchHtml()}</button>
+          <button class="switch" id="opt-hide" role="switch" aria-checked="false" aria-label="Hide perfume names">${switchHtml()}</button>
         </div>
         <div class="toggle-row">
           <div>I'm playing too</div>
@@ -344,6 +344,16 @@ function hostConsoleView() {
     syncPlaySwitch();
     hostnameInput.focus();
   });
+
+  // New games default to the host playing along. Runs once per game: with a
+  // remembered name it registers right away, otherwise the toggle starts in
+  // its pending state with the name form open.
+  const autoPlayKey = `ng:${code}:autoplay`;
+  if (!state.options.hostPlays && state.roundIndex < 0 && !localStorage.getItem(autoPlayKey)) {
+    localStorage.setItem(autoPlayKey, '1');
+    if (storage.name) send({ t: 'options', hostPlays: true, hostName: storage.name });
+    else nameForm.hidden = false;
+  }
 
   document.getElementById('start').addEventListener('click', () => send({ t: 'start-round' }));
   document.getElementById('copy').addEventListener('click', async () => {

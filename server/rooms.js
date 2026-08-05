@@ -62,7 +62,7 @@ class Room {
     this.code = code;
     this.hostKey = randomBytes(18).toString('hex');
     this.lastActivity = Date.now();
-    this.options = { hideNames: true, hostPlays: false };
+    this.options = { hideNames: false, hostPlays: false };
     this.queue = []; // [{id, entry}]
     this.players = new Map(); // playerId -> {id, name, roundScores: (number|null)[]}
     this.phase = 'lobby';
