@@ -1,6 +1,6 @@
 # Parisa's Perfume Night
 
-A party game for perfume nerds. The host lines up perfumes, guests join from their phones through a link, everyone smells the same bottle, and then everyone guesses which notes are actually in it. Right answers score 10 points, wrong ones cost 10. Each round ends with a reveal and a ranking, and the night ends with a winner.
+The host lines up perfumes, guests join from their phones through a link, everyone smells the same bottle, and then everyone guesses which notes are actually in it. Right answers score 10 points, wrong ones cost 10. Each round ends with a reveal and a ranking, and the night ends with a winner.
 
 The whole thing runs on one laptop. There are no accounts and no database, and nothing needs a build step.
 
@@ -15,18 +15,18 @@ npm start
 
 The site is at http://localhost:3000 (set `PORT` to change it). Guests need to reach your machine, so they should be on the same wifi, with the link using your LAN address instead of localhost. A tunnel like ngrok also works.
 
-Games live in server memory and disappear after 12 hours of inactivity, or when the server restarts. For a party, that's a feature.
+Games live in server memory and disappear after 12 hours of inactivity, or when the server restarts. In time, I will host it somewhere. I'd just have to see if my guest like it enough. 
 
 ## How a night works
 
-1. Open the site, click Create game. You're the host now; a key in your browser's localStorage proves it, so only that browser can run the game.
+1. Open the site, click Create game. You're the host now; so only that browser can run the game.
 2. Search perfumes and queue them. The search covers 69,430 perfumes. Bottle photos download in the background as you add things.
 3. Decide two settings: whether players see real names or just "Perfume #1" (hidden by default, better for guessing), and whether you're playing too or just running the show. Spectating hosts see the real answers during the round; the decoys show up dimmed.
 4. Copy the join link and send it to the group. Guests pick a display name and wait in the lobby.
 5. Pass the bottle around, start the round. Everyone picks notes on their phone and locks in. You can't reveal until every connected player has locked; the bar at the bottom tells you who's holding things up. If someone's phone dies, they stop blocking the reveal.
 6. Reveal, enjoy the arguments, start the next round. After the last one, announce the winner and, if the night is going well, start a new game from right there.
 
-Scoring ignores the pyramid: if Bergamot is really in the perfume, picking it counts, even if you found it in the wrong column. The columns exist to make you commit to more guesses, not to trick you twice.
+Scoring ignores the pyramid: if Bergamot is really in the perfume, picking it counts, even if you found it in the wrong column. 
 
 ## What's in the box
 
@@ -36,7 +36,6 @@ Scoring ignores the pyramid: if Bergamot is really in the perfume, picking it co
 - `cache/images/` fills up with bottle photos as perfumes get queued, fetched once each.
 - `plan.md` is the full spec, worth reading before touching the game logic.
 
-The look borrows from heliotemil.com: black on white, Helvetica, two font sizes, uppercase everything, gray hairlines instead of boxes. The styles were written against measurements from the live site, not from memory of it.
 
 The decoy notes are the quiet trick of the game. Fake candidates are drawn using per-tier frequency counts across the whole dataset, so a fake base note is something that plausibly *is* a base note (Musk, Amber) rather than a random word. Real notes are excluded from the decoy pool everywhere, including across tiers.
 
