@@ -185,14 +185,16 @@ class Room {
     const connected = this.connectedPlayerIds();
     return [...this.players.values()]
       .filter((p) => !this.round.locked.has(p.id))
-      .map((p) => ({ name: p.name, connected: connected.has(p.id) }));
+      .map((p) => ({ id: p.id, name: p.name, connected: connected.has(p.id) }));
   }
 
   reveal() {
     if (this.phase !== 'guessing') throw new GameError('NO_ROUND', 'No round in progress.');
     const blocking = this.pendingPlayers().filter((p) => p.connected);
     if (blocking.length) {
-      throw new GameError('NOT_LOCKED', `Waiting on ${blocking.map((p) => p.name).join(', ')} to lock in.`);
+      // reveal() is host-invoked, so the host player reads as "you".
+      const names = blocking.map((p) => (p.id === HOST_PLAYER_ID ? 'you' : p.name));
+      throw new GameError('NOT_LOCKED', `Waiting on ${names.join(', ')} to lock in.`);
     }
     const real = allNotes(this.current.entry);
     const realKeys = new Set(real.map(norm));
@@ -317,7 +319,13 @@ class Room {
         state.round.locked = locked.has(playerId);
       }
       if (spoil) state.round.image = imageUrl(this.current.id);
-      if (isHost) state.round.pending = this.pendingPlayers();
+      if (isHost) {
+        state.round.pending = this.pendingPlayers().map(({ id, name, connected }) => ({
+          name,
+          connected,
+          you: id === playerId,
+        }));
+      }
       if (spectating) state.round.real = allNotes(this.current.entry); // decoys shown dimmed
     }
 

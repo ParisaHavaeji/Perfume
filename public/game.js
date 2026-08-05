@@ -446,10 +446,8 @@ function spectateView() {
 
 // ---- reveal / final ---------------------------------------------------------
 
-function bottleHtml(image, name, brand) {
-  return image
-    ? `<div class="bottle"><img src="${esc(image)}" alt="Bottle of ${esc(name)}" /></div>`
-    : `<div class="bottle noimg"><span>${esc(name)}<br />${esc(brand)}</span></div>`;
+function bottleHtml(image, name) {
+  return image ? `<div class="bottle"><img src="${esc(image)}" alt="Bottle of ${esc(name)}" /></div>` : '';
 }
 
 /**
@@ -491,7 +489,7 @@ function revealView() {
   app.innerHTML = `
     <div class="wide">
       <div class="reveal-center">
-        ${bottleHtml(reveal.image, reveal.name, reveal.brand)}
+        ${bottleHtml(reveal.image, reveal.name)}
         <h1 class="reveal-name">${esc(reveal.name)} — ${esc(reveal.brand)}</h1>
         ${reveal.result ? `<p class="eyebrow score-note">Round score ${signed(reveal.result.score)}</p>` : ''}
       </div>
@@ -537,7 +535,7 @@ function updateHostbar() {
   if (state.phase === 'guessing') {
     const pending = state.round.pending ?? [];
     const waiting = pending.length
-      ? ` — waiting on ${pending.map((p) => `<span class="who${p.connected ? '' : ' off'}">${esc(p.name)}</span>`).join(', ')}`
+      ? ` — waiting on ${pending.map((p) => `<span class="who${p.connected ? '' : ' off'}">${p.you ? 'you' : esc(p.name)}</span>`).join(', ')}`
       : '';
     stat.innerHTML = `${state.round.lockedCount} / ${state.round.playerCount} locked${waiting}`;
     const blocked = pending.some((p) => p.connected);

@@ -225,11 +225,6 @@ body.has-hostbar main { padding-bottom: 140px; }
 .reveal-name { margin: 0; text-wrap: balance; }
 .bottle { width: min(220px, 60vw); }
 .bottle img { display: block; width: 100%; height: auto; }
-.bottle.noimg {
-  aspect-ratio: 3 / 4;
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px; text-align: center;
-}
 
 .verdicts { display: flex; flex-direction: column; gap: 26px; max-width: 640px; margin: 0 auto 36px; }
 .verdict-group h5 { font-weight: 400; margin: 0 0 10px; }
