@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: nose-game
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 22

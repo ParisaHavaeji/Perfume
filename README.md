@@ -15,7 +15,16 @@ npm start
 
 The site is at http://localhost:3000 (set `PORT` to change it). Guests need to reach your machine, so they should be on the same wifi, with the link using your LAN address instead of localhost. A tunnel like ngrok also works.
 
-Games live in server memory and disappear after 12 hours of inactivity, or when the server restarts. In time, I will host it somewhere. I'd just have to see if my guest like it enough. 
+Games live in server memory and disappear after 12 hours of inactivity, or when the server restarts.
+
+## Putting it online
+
+GitHub Pages won't work: it only serves static files, and this game needs a live Node process for the WebSockets, the scoring, and the image fetching. Anything that runs Node will do. `render.yaml` sets it up for Render's free tier:
+
+1. On Render, click New → Blueprint and point it at this repo. It reads `render.yaml` and needs nothing else.
+2. Wait for the first deploy, then open the URL it gives you. That's the host's link.
+
+Two things to know about the free tier. The instance sleeps after about 15 minutes without traffic and takes half a minute to wake, so open the site a minute before the guests arrive. And the disk is wiped on every restart, so `cache/images/` starts empty and bottle photos download again the first time each perfume gets queued.
 
 ## How a night works
 
