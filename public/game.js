@@ -33,6 +33,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const norm = (s) => s.trim().toLowerCase(); // mirrors server/data.js norm
 const signed = (n) => (n > 0 ? `+${n}` : String(n).replace('-', '−'));
 const tierName = (t) => (t === 'flat' ? 'Notes' : t);
+const soloHost = () => state.role === 'host-playing' && state.players.length === 1; // host playing alone — no winner ceremony
 const switchHtml = () => '<span class="w-on">On</span> / <span class="w-off">Off</span>';
 
 // One name field + inline validation, shared by the join and play-along forms.
@@ -513,14 +514,18 @@ function finalView() {
   const { final } = state;
   const winner = final.standings[0];
   const isHostView = state.role !== 'player';
+  const solo = soloHost();
+  const headline = solo
+    ? { name: `You scored ${winner?.total ?? 0}`, sub: `over ${final.roundCount} round${final.roundCount === 1 ? '' : 's'}` }
+    : { eyebrow: 'Winner', name: esc(winner?.name ?? '—'), sub: `${winner?.total ?? 0} points` };
   app.innerHTML = `
     <div class="wide">
       <div class="winner-block">
-        <p class="eyebrow">Winner</p>
-        <h1 class="winner-name">${esc(winner?.name ?? '—')}</h1>
-        <p class="winner-score">${winner?.total ?? 0} points</p>
+        ${headline.eyebrow ? `<p class="eyebrow">${headline.eyebrow}</p>` : ''}
+        <h1 class="winner-name">${headline.name}</h1>
+        <p class="winner-score">${headline.sub}</p>
       </div>
-      ${rankingHtml(final.standings, 'Final standings', final.roundCount)}
+      ${rankingHtml(final.standings, solo ? 'Your rounds' : 'Final standings', final.roundCount)}
       ${isHostView ? '<div class="final-actions"><button class="btn" id="new-game">Start a new game</button></div>' : ''}
     </div>`;
   if (isHostView) {
@@ -553,7 +558,7 @@ function updateHostbar() {
   } else if (state.phase === 'reveal') {
     stat.textContent = `Round ${state.roundIndex + 1} of ${state.roundCount}`;
     actions.innerHTML = state.reveal.lastRound
-      ? '<button class="btn" data-act="finish">Announce winners</button>'
+      ? `<button class="btn" data-act="finish">${soloHost() ? 'Finish game' : 'Announce winners'}</button>`
       : '<button class="btn" data-act="start-round">Next round</button>';
   }
 }

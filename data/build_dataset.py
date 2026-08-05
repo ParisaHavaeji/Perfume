@@ -4,6 +4,8 @@ Sources, in priority order (first one to claim a brand+name wins):
   1. Fragrantica (raw/fra_perfumes.csv) — notes parsed from the description text
   2. Parfumo    (raw/parfumo_tidytuesday.csv) — structured note columns
   3. Luckyscent (raw/luckyscent_notes.jsonl) — flat notes from our own crawl
+  4. Fragrantica refresh (raw/fragrantica_new.jsonl) — 2024+ releases, own crawl
+     via fragrantica_refresh.py (last so it only fills the gap)
 
 Run clean_dataset.py afterwards to normalize and emit the browser-ready files.
 """
@@ -147,6 +149,36 @@ def load_luckyscent():
     return out
 
 
+def load_fragrantica_refresh():
+    """2024+ releases crawled by fragrantica_refresh.py (raw/fragrantica_new.jsonl)."""
+    path = os.path.join(RAW, "fragrantica_new.jsonl")
+    if not os.path.exists(path):
+        return []
+    out = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            rec = json.loads(line)
+            if rec.get("error") or not rec.get("notes"):
+                continue
+            structure, notes = tiers_to_entry(rec["notes"])
+            out.append(
+                {
+                    "name": rec["name"],
+                    "brand": rec["brand"],
+                    "year": rec["year"],
+                    "gender": rec["gender"],
+                    "source": "fragrantica",
+                    "structure": structure,
+                    "notes": notes,
+                    "fid": rec["fid"],
+                    "concentration": None,
+                    "rating": rec["rating"],
+                    "ratingCount": rec["votes"],
+                }
+            )
+    return out
+
+
 def dedupe(perfumes):
     """Keep one entry per (brand, name); higher-priority source / more votes wins."""
     by_key = {}
@@ -163,7 +195,8 @@ def dedupe(perfumes):
 
 
 def main():
-    sources = [load_fragrantica(), load_parfumo(), load_luckyscent()]
+    # the refresh goes last so it only adds what the older dumps are missing
+    sources = [load_fragrantica(), load_parfumo(), load_luckyscent(), load_fragrantica_refresh()]
     for chunk in sources:
         if chunk:
             print(f"{chunk[0]['source']}: {len(chunk)} with notes")
