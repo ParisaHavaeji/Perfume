@@ -17,9 +17,23 @@ const MAX_NAME_LENGTH = 24;
 const MAX_QUEUE = 30;
 const HOST_PLAYER_ID = 'host';
 
-// Points per pick. Sent to clients in every state so the UI never hardcodes
-// the rules; rooms.js is the only place these numbers exist.
-const SCORING = { hit: 10, wrong: -10 };
+// The two ways a game can score, chosen by the host:
+// - open: pick as many notes as you like; wrong picks cost points.
+// - limited: pick only your best few notes; wrong picks are free.
+// Each round snapshots its mode's rules at start and every state push carries
+// them, so the UI never hardcodes the numbers and rooms.js is the only place
+// they exist.
+const MODES = {
+  open: { hit: 10, wrong: -10 },
+  limited: { hit: 10, wrong: 0 },
+};
+// In limited mode players get 5 picks, or 4 when the perfume has fewer notes.
+const LIMITED_PICKS = { min: 4, max: 5 };
+
+function maxPicksFor(mode, entry) {
+  if (mode !== 'limited') return null;
+  return Math.max(LIMITED_PICKS.min, Math.min(LIMITED_PICKS.max, allNotes(entry).length));
+}
 
 const rooms = new Map(); // code -> Room
 
@@ -62,7 +76,7 @@ class Room {
     this.code = code;
     this.hostKey = randomBytes(18).toString('hex');
     this.lastActivity = Date.now();
-    this.options = { hideNames: false, hostPlays: false };
+    this.options = { hideNames: false, hostPlays: false, mode: 'open' };
     this.queue = []; // [{id, entry}]
     this.players = new Map(); // playerId -> {id, name, roundScores: (number|null)[]}
     this.phase = 'lobby';
@@ -118,8 +132,9 @@ class Room {
 
   // ---- host actions ---------------------------------------------------------
 
-  setOptions({ hideNames, hostPlays, hostName }) {
+  setOptions({ hideNames, hostPlays, hostName, mode }) {
     if (typeof hideNames === 'boolean') this.options.hideNames = hideNames;
+    if (typeof mode === 'string' && Object.hasOwn(MODES, mode)) this.options.mode = mode;
     if (typeof hostPlays === 'boolean') {
       this.options.hostPlays = hostPlays;
       if (hostPlays) {
@@ -169,6 +184,9 @@ class Room {
       picks: new Map(),
       locked: new Set(),
       results: null,
+      // Rules are frozen per round: a mode switch mid-round can't rewrite it.
+      scoring: MODES[this.options.mode],
+      maxPicks: maxPicksFor(this.options.mode, this.current.entry),
     };
     this.phase = 'guessing';
     this.touch();
@@ -206,7 +224,7 @@ class Room {
       const wrong = [];
       for (const [key, display] of picked) (realKeys.has(key) ? hits : wrong).push(display);
       const missed = real.filter((n) => !picked.has(norm(n)));
-      const score = SCORING.hit * hits.length + SCORING.wrong * wrong.length;
+      const score = this.round.scoring.hit * hits.length + this.round.scoring.wrong * wrong.length;
       player.roundScores[this.roundIndex] = score;
       this.round.results.set(player.id, { hits, wrong, missed, score });
     }
@@ -228,10 +246,12 @@ class Room {
     if (this.phase !== 'guessing') throw new GameError('GUESSING_CLOSED', 'Guessing is closed.');
     if (!this.players.has(playerId)) throw new GameError('NOT_JOINED', 'Join the game first.');
     if (this.round.locked.has(playerId)) throw new GameError('LOCKED', 'Your guesses are locked.');
-    const picks = (Array.isArray(notes) ? notes : []).filter(
-      (n) => typeof n === 'string' && this.round.offered.has(norm(n)),
-    );
-    this.round.picks.set(playerId, picks.slice(0, this.round.offered.size));
+    // Dedup by note identity while filtering, so the pick cap counts distinct notes.
+    const picked = new Map();
+    for (const n of Array.isArray(notes) ? notes : []) {
+      if (typeof n === 'string' && this.round.offered.has(norm(n))) picked.set(norm(n), n);
+    }
+    this.round.picks.set(playerId, [...picked.values()].slice(0, this.round.maxPicks ?? this.round.offered.size));
     this.touch();
     // No broadcast: picks are private, and nothing anyone else sees depends
     // on them until lock/reveal. This is the hottest path in the app.
@@ -278,7 +298,6 @@ class Room {
       roundIndex: this.roundIndex,
       roundCount: this.queue.length,
       options: this.options,
-      scoring: SCORING,
       role: isHost ? (this.options.hostPlays ? 'host-playing' : 'host-spectating') : 'player',
       players: [...this.players.values()].map((p) => ({
         name: p.name,
@@ -311,6 +330,8 @@ class Room {
         label: this.roundLabel(spoil),
         structure: this.current.entry.structure,
         columns,
+        scoring: this.round.scoring,
+        maxPicks: this.round.maxPicks,
         lockedCount: locked.size,
         playerCount: this.players.size,
       };
@@ -335,6 +356,7 @@ class Room {
         name: entry.name,
         brand: entry.brand,
         image: imageUrl(this.current.id),
+        scoring: this.round.scoring,
         ranking: this.ranking(this.roundIndex).map((r) => ({
           ...r,
           you: r.playerId === playerId,

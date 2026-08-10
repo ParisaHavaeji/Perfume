@@ -70,6 +70,11 @@ def get(url, retries=3):
         except urllib.error.HTTPError as e:
             if e.code in (403, 503):
                 sys.exit(f"blocked ({e.code}) on {url} -- Cloudflare is challenging us; retry later")
+            if e.code == 429:
+                if attempt == retries - 1:
+                    sys.exit(f"rate limited (429) on {url} even after backoff -- retry later")
+                time.sleep(120 * (attempt + 1))
+                continue
             if e.code == 404 or attempt == retries - 1:
                 raise
             time.sleep(15 * (attempt + 1))
@@ -292,10 +297,13 @@ def parse_notes(page):
     return tiers, desc
 
 
-def cmd_crawl(limit, dry_run):
+def cmd_crawl(limit, dry_run, match=None):
     _, crawled, missing = missing_entries()
+    if match:
+        m = match.lower()
+        missing = [e for e in missing if m in f"{e['brand']} {e['name']}".lower()]
     todo = missing[:limit] if limit else missing
-    print(f"{len(missing)} missing perfumes, crawling {len(todo)} (already crawled {len(crawled)})")
+    print(f"{len(missing)} missing perfumes, crawling {len(todo)} (already crawled {len(crawled)})", flush=True)
     if dry_run:
         for e in todo[:40]:
             print(f"  {e['votes'] or 0:>6} votes  {e['brand']} - {e['name']} ({e['year']})")
@@ -343,11 +351,12 @@ def main():
     ap.add_argument("phase", choices=["index", "crawl", "status"])
     ap.add_argument("--limit", type=int, help="crawl at most N pages this run")
     ap.add_argument("--dry-run", action="store_true", help="crawl: list what would be fetched")
+    ap.add_argument("--match", help="crawl: only perfumes whose brand+name contains this (case-insensitive)")
     args = ap.parse_args()
     if args.phase == "index":
         cmd_index()
     elif args.phase == "crawl":
-        cmd_crawl(args.limit, args.dry_run)
+        cmd_crawl(args.limit, args.dry_run, args.match)
     else:
         cmd_status()
 

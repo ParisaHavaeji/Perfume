@@ -267,6 +267,13 @@ function hostConsoleView() {
           <button class="switch" id="opt-hide" role="switch" aria-checked="false" aria-label="Hide perfume names">${switchHtml()}</button>
         </div>
         <div class="toggle-row">
+          <div>
+            <div>Best-guess mode</div>
+            <p class="sub">Players pick only their 4–5 surest notes, and wrong picks cost nothing. Off: pick freely, wrong picks lose points.</p>
+          </div>
+          <button class="switch" id="opt-mode" role="switch" aria-checked="false" aria-label="Best-guess mode">${switchHtml()}</button>
+        </div>
+        <div class="toggle-row">
           <div>I'm playing too</div>
           <button class="switch" id="opt-play" role="switch" aria-checked="false" aria-label="I'm playing too">${switchHtml()}</button>
         </div>
@@ -316,6 +323,9 @@ function hostConsoleView() {
 
   document.getElementById('opt-hide').addEventListener('click', () => {
     send({ t: 'options', hideNames: !state.options.hideNames });
+  });
+  document.getElementById('opt-mode').addEventListener('click', () => {
+    send({ t: 'options', mode: state.options.mode === 'limited' ? 'open' : 'limited' });
   });
   // The play toggle can be "pending": on, but waiting for a display name.
   // syncPlaySwitch keeps the visual state truthful the moment the form opens,
@@ -372,6 +382,7 @@ function hostConsoleView() {
         </div>`)
       .join('') || '<p class="sub queue-empty">Search above to queue the first perfume.</p>';
     document.getElementById('opt-hide').setAttribute('aria-checked', String(state.options.hideNames));
+    document.getElementById('opt-mode').setAttribute('aria-checked', String(state.options.mode === 'limited'));
     syncPlaySwitch();
     const start = document.getElementById('start');
     start.textContent = `Start round ${state.roundIndex + 2}`;
@@ -391,16 +402,20 @@ function columnsHtml(columns, chipHtml) {
 }
 
 function guessView() {
-  const { round, scoring } = state;
+  const { round } = state;
+  const { scoring, maxPicks } = round;
+  const rules = maxPicks
+    ? `Pick the ${maxPicks} notes you're most sure of. ${signed(scoring.hit)} correct · wrong picks are free.`
+    : `Pick every note you believe is in it. ${signed(scoring.hit)} correct · ${signed(scoring.wrong)} wrong.`;
   app.innerHTML = `
     <div class="wide round">
       <p class="eyebrow centered">Now smelling</p>
       <h1 class="round-name" id="guess-name">${esc(round.label)}</h1>
-      <p class="round-sub">Pick every note you believe is in it. ${signed(scoring.hit)} correct · ${signed(scoring.wrong)} wrong.</p>
+      <p class="round-sub">${rules}</p>
       <div id="guess-bottle"></div>
       ${columnsHtml(round.columns, (n) => `<button class="chip" data-note="${esc(n)}" aria-pressed="false">${esc(n)}</button>`)}
       <div class="round-foot" id="foot">
-        <span class="picked"><span id="pickcount">0</span> notes picked</span>
+        <span class="picked"><span id="pickcount">0</span>${maxPicks ? ` / ${maxPicks}` : ''} notes picked</span>
         <button class="btn" id="lock">Lock in guesses</button>
       </div>
       <p class="locked-note" id="locked-note" hidden>Locked — waiting for the reveal</p>
@@ -410,9 +425,12 @@ function guessView() {
   // visibility mid-round.
   const syncBottle = bottleSyncer('guess-bottle');
   const update = () => {
+    // At the pick limit, unpicked chips disable so the cap explains itself.
+    const atLimit = maxPicks && picks.size >= maxPicks;
     for (const chip of app.querySelectorAll('.chip')) {
-      chip.setAttribute('aria-pressed', String(picks.has(norm(chip.dataset.note))));
-      chip.disabled = Boolean(state.round.locked);
+      const pressed = picks.has(norm(chip.dataset.note));
+      chip.setAttribute('aria-pressed', String(pressed));
+      chip.disabled = Boolean(state.round.locked) || (atLimit && !pressed);
     }
     document.getElementById('guess-name').textContent = state.round.label;
     syncBottle();
@@ -426,6 +444,7 @@ function guessView() {
     if (!chip || state.round.locked) return;
     const key = norm(chip.dataset.note);
     if (picks.has(key)) picks.delete(key);
+    else if (maxPicks && picks.size >= maxPicks) return; // chip is disabled; belt and braces
     else picks.add(key);
     update();
     // Send display-cased notes so the server can echo them back readably.
@@ -483,12 +502,14 @@ function rankingHtml(rows, caption, roundCount = 0) {
 }
 
 function revealView() {
-  const { reveal, scoring } = state;
+  const { reveal } = state;
+  const { scoring } = reveal;
+  const wrongPts = scoring.wrong ? ` <span class="pts">${signed(scoring.wrong)}</span>` : '';
   const verdicts = reveal.result
     ? `<div class="verdicts">
         <div class="verdict-group"><h5>Your picks</h5><div class="vchips">
           ${reveal.result.hits.map((n) => `<span class="v hit">${esc(n)} <span class="pts">${signed(scoring.hit)}</span></span>`).join('')}
-          ${reveal.result.wrong.map((n) => `<span class="v wrong">${esc(n)} <span class="pts">${signed(scoring.wrong)}</span></span>`).join('')}
+          ${reveal.result.wrong.map((n) => `<span class="v wrong">${esc(n)}${wrongPts}</span>`).join('')}
           ${reveal.result.hits.length + reveal.result.wrong.length === 0 ? '<span class="v miss">No picks</span>' : ''}
         </div></div>
         ${reveal.result.missed.length ? `<div class="verdict-group"><h5>You missed</h5><div class="vchips">${reveal.result.missed.map((n) => `<span class="v miss">${esc(n)}</span>`).join('')}</div></div>` : ''}
