@@ -3,12 +3,12 @@
 // JSON API for creating/inspecting games, and the realtime game protocol.
 import http from 'node:http';
 import { createReadStream } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
 import { WebSocketServer } from 'ws';
-import { SEARCH_INDEX_PATH } from './data.js';
+import { initData, searchIndexGzip } from './data.js';
+import { addFromUrl, AddPerfumeError } from './fragrantica.js';
 import { initImageCache, serveImage } from './images.js';
 import { createRoom, getRoom, GameError, CODE_LENGTH, GAME_TITLE } from './rooms.js';
 
@@ -22,13 +22,34 @@ const MIME = {
   '.js': 'text/javascript; charset=utf-8',
 };
 
-// The search index is large and immutable while the server runs: gzipped once
-// at startup, before listen(), so the block never lands mid-game.
-let searchIndexGz;
-
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(payload));
+}
+
+/** Parsed JSON request body, or null if malformed / over the size cap. */
+function readJsonBody(req, maxBytes = 4096) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        resolve(null);
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch {
+        resolve(null);
+      }
+    });
+    req.on('error', () => resolve(null));
+  });
 }
 
 async function serveStatic(res, file) {
@@ -70,9 +91,10 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, {
         'content-type': 'application/json; charset=utf-8',
         'content-encoding': 'gzip',
-        'cache-control': 'public, max-age=3600',
+        // short-lived: the index grows when a host adds a perfume by URL
+        'cache-control': 'public, max-age=300',
       });
-      return res.end(searchIndexGz);
+      return res.end(searchIndexGzip());
     }
     if (req.method === 'GET' && pathname.startsWith('/img/')) {
       return serveImage(Number(pathname.slice('/img/'.length)), res);
@@ -80,6 +102,20 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && pathname === '/api/games') {
       const room = createRoom();
       return sendJson(res, 201, { code: room.code, hostKey: room.hostKey });
+    }
+    if (req.method === 'POST' && pathname === '/api/perfumes') {
+      const body = await readJsonBody(req);
+      const room = body ? getRoom(body.code) : null;
+      if (!room || body.hostKey !== room.hostKey) {
+        return sendJson(res, 403, { error: 'Only a game host can add perfumes.' });
+      }
+      try {
+        const { entry, existed } = await addFromUrl(body.url);
+        return sendJson(res, existed ? 200 : 201, { entry, existed });
+      } catch (err) {
+        if (err instanceof AddPerfumeError) return sendJson(res, err.status, { error: err.message });
+        throw err;
+      }
     }
     if (req.method === 'GET' && pathname.startsWith('/api/games/')) {
       const room = getRoom(pathname.slice('/api/games/'.length));
@@ -170,6 +206,5 @@ wss.on('connection', (ws) => {
   });
 });
 
-const [, searchIndexRaw] = await Promise.all([initImageCache(), readFile(SEARCH_INDEX_PATH)]);
-searchIndexGz = gzipSync(searchIndexRaw);
+await Promise.all([initImageCache(), initData()]);
 server.listen(PORT, () => console.log(`nose-game listening on http://localhost:${PORT}`));

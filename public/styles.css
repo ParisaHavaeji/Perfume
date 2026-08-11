@@ -139,6 +139,7 @@ h1.title { margin: 0 0 10px; text-wrap: balance; }
 .result .brand { color: var(--faint); }
 .result .add { white-space: nowrap; }
 .result:hover .add { color: var(--ink); }
+.results .no-results { padding: 10px 0; margin: 0; }
 
 .list-head {
   display: flex; justify-content: space-between; align-items: baseline;

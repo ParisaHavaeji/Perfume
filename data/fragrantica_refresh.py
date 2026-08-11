@@ -11,6 +11,7 @@ Usage:
     python fragrantica_refresh.py index            # harvest 2024+ releases (~1-2 min, ~100 requests)
     python fragrantica_refresh.py crawl            # crawl notes for missing perfumes (resumable)
     python fragrantica_refresh.py crawl --limit 500
+    python fragrantica_refresh.py crawl --fids 129373,129374   # only these ids
     python fragrantica_refresh.py status           # counts: harvested / crawled / remaining
 
 `index` rewrites raw/fragrantica_index.jsonl. `crawl` appends to
@@ -297,8 +298,13 @@ def parse_notes(page):
     return tiers, desc
 
 
-def cmd_crawl(limit, dry_run, match=None):
+def cmd_crawl(limit, dry_run, match=None, fids=None):
     _, crawled, missing = missing_entries()
+    if fids:
+        missing = [e for e in missing if e["fid"] in fids]
+        absent = fids - {e["fid"] for e in missing}
+        if absent:
+            print(f"skipping {len(absent)} fids not in the index or already crawled/merged: {sorted(absent)}", flush=True)
     if match:
         m = match.lower()
         missing = [e for e in missing if m in f"{e['brand']} {e['name']}".lower()]
@@ -352,11 +358,13 @@ def main():
     ap.add_argument("--limit", type=int, help="crawl at most N pages this run")
     ap.add_argument("--dry-run", action="store_true", help="crawl: list what would be fetched")
     ap.add_argument("--match", help="crawl: only perfumes whose brand+name contains this (case-insensitive)")
+    ap.add_argument("--fids", help="crawl: only these Fragrantica ids, comma-separated")
     args = ap.parse_args()
     if args.phase == "index":
         cmd_index()
     elif args.phase == "crawl":
-        cmd_crawl(args.limit, args.dry_run, args.match)
+        fids = {int(x) for x in args.fids.split(",")} if args.fids else None
+        cmd_crawl(args.limit, args.dry_run, args.match, fids)
     else:
         cmd_status()
 
