@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { initData, searchIndexGzip } from './data.js';
 import { addFromUrl, AddPerfumeError } from './parfumo.js';
+import { replayLiveAdds } from './liveadds.js';
 import { initImageCache, serveImage } from './images.js';
 import { createRoom, getRoom, GameError, CODE_LENGTH, GAME_TITLE } from './rooms.js';
 
@@ -207,4 +208,5 @@ wss.on('connection', (ws) => {
 });
 
 await Promise.all([initImageCache(), initData()]);
+await replayLiveAdds();
 server.listen(PORT, () => console.log(`nose-game listening on http://localhost:${PORT}`));

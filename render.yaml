@@ -6,6 +6,17 @@ services:
     buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /
+    # Live adds are committed back to the repo by the server (see
+    # server/liveadds.js); don't redeploy — and wipe in-progress games —
+    # when a push only touches that file.
+    buildFilter:
+      ignoredPaths:
+        - data/raw/parfumo_new.jsonl
     envVars:
       - key: NODE_VERSION
         value: 22
+      # Fine-grained PAT with contents read/write on this repo; set in the
+      # Render dashboard. Without it live adds still work but only last
+      # until the instance restarts.
+      - key: GITHUB_TOKEN
+        sync: false

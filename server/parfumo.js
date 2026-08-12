@@ -1,16 +1,11 @@
 // Live gap-fill: the host pastes a Parfumo perfume URL for something the
 // search can't find. (Fragrantica blocks server-side fetches, so we point
 // hosts at parfumo.com instead — its pages load fine without a browser.)
-// We fetch the page, parse the note pyramid, append the record to
-// data/raw/parfumo_new.jsonl (so the offline pipeline merges it), and add it
+// We fetch the page, parse the note pyramid, persist the record via
+// liveadds.js (local jsonl + GitHub mirror, replayed at boot), and add it
 // to the served dataset so it is searchable and queueable immediately.
-import { appendFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { addPerfume, findByUrl } from './data.js';
-
-const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const RAW_NOTES_PATH = path.join(ROOT, 'data', 'raw', 'parfumo_new.jsonl');
+import { appendRecord, tiersToEntry } from './liveadds.js';
 
 const FETCH_TIMEOUT_MS = 20_000;
 const HDRS = {
@@ -67,13 +62,6 @@ function parseNotes(page) {
     if (note && !tier.includes(note)) tier.push(note);
   }
   return Object.values(tiers).some((t) => t.length) ? tiers : null;
-}
-
-/** Structure/notes fields from a {top, middle, base} dict (build_dataset.tiers_to_entry). */
-function tiersToEntry(tiers) {
-  const filled = ['top', 'middle', 'base'].filter((t) => tiers[t].length);
-  if (filled.length === 1) return { structure: 'flat', notes: { flat: tiers[filled[0]] } };
-  return { structure: filled.length === 3 ? 'pyramid' : 'partial', notes: tiers };
 }
 
 async function fetchPage(url) {
@@ -146,7 +134,7 @@ export function addFromUrl(rawUrl) {
       gender: null,
       notes: tiers,
     };
-    await appendFile(RAW_NOTES_PATH, JSON.stringify(record) + '\n', 'utf8');
+    await appendRecord(record);
 
     const entry = await addPerfume({ ...record, structure, notes });
     console.log(`added from URL: ${brand} - ${name} as id ${entry.i}`);
