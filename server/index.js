@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { initData, searchIndexGzip } from './data.js';
-import { addFromUrl, AddPerfumeError } from './fragrantica.js';
+import { addFromUrl, AddPerfumeError } from './parfumo.js';
 import { initImageCache, serveImage } from './images.js';
 import { createRoom, getRoom, GameError, CODE_LENGTH, GAME_TITLE } from './rooms.js';
 

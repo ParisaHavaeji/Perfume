@@ -1,14 +1,8 @@
-/* Design system: HELIOT EMIL monochrome (see plan.md).
-   Measured from heliotemil.com: Helvetica Now Text (fallback Helvetica/Arial),
-   font-weight 400 only, exactly two sizes — 10px/14px base and 14px accents —
-   uppercase with NORMAL letter-spacing, hairlines #c3c3c3, inactive gray
-   #c3c3c3, 15px page gutters, no rounded corners, no shadows, no color.
-   Deliberately light-only, like the reference site — no dark mode. */
 
 :root {
   --bg: #ffffff;
   --ink: #000000;
-  --faint: #c3c3c3;     /* hairlines AND inactive text — one gray, like the site */
+  --faint: #c3c3c3;
   --panel: #fafafa;
   color-scheme: light;
 }
@@ -30,7 +24,7 @@ button { font: inherit; text-transform: inherit; border-radius: 0; }
 a { color: inherit; text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-/* The accent size — the only other size in the system. */
+
 .title, .round-name, .reveal-name, .winner-name { font-size: 14px; line-height: 18px; font-weight: 400; }
 
 /* ---------- chrome ---------- */
@@ -42,8 +36,7 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--faint);
   white-space: nowrap;
 }
-/* Title dead-center; the flanking 1fr tracks keep it centered even when the
-   right slot has content. */
+
 .topbar > span:first-child { grid-column: 2; text-align: center; }
 .topbar .dim { grid-column: 3; justify-self: end; color: var(--faint); overflow: hidden; text-overflow: ellipsis; }
 

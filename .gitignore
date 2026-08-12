@@ -2,7 +2,5 @@ __pycache__/
 *.pyc
 node_modules/
 cache/
-
-# AI assistant working notes, not part of the published project
 PLAN.md
 .claude/

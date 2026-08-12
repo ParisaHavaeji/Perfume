@@ -12,7 +12,7 @@ The host lines up perfumes, guests join from their phones, everyone smells the s
 4. Pass the scent strip around and start the round. Everyone picks notes on their phone and locks in. You can't reveal until every connected player has locked; the bar at the bottom shows who's holding things up.
 5. Reveal, enjoy the arguments, start the next round.
 
-There are two ways to score a night, and the host picks. The default is to pick as many notes as you like, +10 for each right one, -10 for each wrong one, so ticking half the board would backfire. Best-guess mode instead caps everyone at their five surest picks (four, when the perfume doesn't have as many notes to begin with) and wrong picks cost nothing (added after a friend told me she felt like she was taking Konkoor-- the Iranian university entrance exam) best-guess is kinder to a first-timer who'd rather not finish round one at -40. The host can flip the switch between rounds, but a round already in progress keeps the rules it started with.
+There are two ways to score a night, and the host picks. The default is to pick as many notes as you like, +10 for each right one, -10 for each wrong one, so ticking half the board would backfire. Best-guess mode instead caps everyone at their five surest picks (four, when the perfume doesn't have as many notes to begin with) and wrong picks cost nothing (added after a friend told me he felt like he was taking the Konkoor-- the Iranian university entrance exam). Best-guess is kinder to a first-timer who'd rather not finish round one at -40. The host can flip the switch between rounds, but a round already in progress keeps the rules it started with.
 
 Either way, scoring ignores the scent pyramid; if Bergamot is really in the perfume, picking it counts, even in the wrong column (for example, chosen as the base note rather than the top).
 
@@ -41,7 +41,7 @@ The site is at http://localhost:3000. Guests need to reach your machine, so use 
 
 ## The dataset
 
-69,430 perfumes merged from three sources: Fragrantica (Kaggle scrape, 46,379), Parfumo (TidyTuesday CSV, 21,681 after removing overlap), and Luckyscent (own crawl, 1,659 niche releases the databases miss-- I get my perfumes from their DTLA store so it was the most straight forward way of ensuring all my perfumes were listed). Most have a top/middle/base pyramid; 1,762 list their notes flat and get a single-column interface in the game.
+69,430 perfumes merged from three sources: Fragrantica (Kaggle scrape, 46,379), Parfumo (TidyTuesday CSV, 21,681 after removing overlap), and Luckyscent (own crawl, 1,659 niche releases the databases miss-- I get my perfumes from their DTLA store so it was the most straight forward way of ensuring all my perfumes were listed). Most have a top/middle/base pyramid; 1,762 list their notes flat and get a single-column interface in the game.If a perfume is still missing, the user could add it by pasting the fragrantica link. 
 
 The build emits `data/out/search_index.json` for the perfume picker, `data/out/notes/<n>.json` in shards of 1,000 so nothing loads the whole thing, and `data/out/notes_vocab.json` with per-tier note frequencies, which is what makes the decoys believable. Bottle images come from Fragrantica's CDN by id, or from the product page's og:image, fetched once and cached in `cache/images/`.
 

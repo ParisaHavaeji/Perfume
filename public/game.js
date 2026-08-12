@@ -246,22 +246,20 @@ function searchPerfumes(query, limit = 20) {
   return scored.slice(0, limit).map(([, p]) => p);
 }
 
-// A pasted Fragrantica perfume link (any language edition) — the fallback for
-// perfumes the search index doesn't know yet. Mirrors URL_RE in server/fragrantica.js.
-const FRAG_URL_RE = /(?:https?:\/\/)?(?:[a-z0-9-]+\.)*fragrantica\.[a-z.]{2,6}\/perfume\/([^/?#\s]+)\/([^/?#\s]+)-\d+\.html/i;
-const titlecaseSlug = (slug) =>
-  slug
-    .split('-')
-    .filter(Boolean)
-    .map((w) => (w === w.toUpperCase() ? w : w[0].toUpperCase() + w.slice(1).toLowerCase()))
-    .join(' ');
+// A pasted Parfumo perfume link (any language edition) — the fallback for
+// perfumes the search index doesn't know yet. Mirrors URL_RE in server/parfumo.js.
+const PARFUMO_URL_RE = /(?:https?:\/\/)?(?:[a-z0-9-]+\.)*parfumo\.[a-z.]{2,6}\/(?:Perfumes|Parfums)\/([^/?#\s]+)\/([^/?#\s]+)/i;
+// Fragrantica blocks server-side fetches, so those links get a redirect hint.
+const FRAG_URL_RE = /(?:[a-z0-9-]+\.)*fragrantica\.[a-z.]{2,6}\//i;
+// Preview label only — the server reads the real name off the page.
+const slugText = (slug) => decodeURIComponent(slug).replace(/[_-]+/g, ' ').trim();
 
 function hostConsoleView() {
   app.innerHTML = `
     <div class="wide host-grid">
       <section>
         <div class="search-box">
-          <input id="search" type="search" placeholder="Search perfumes, or paste a Fragrantica link" autocomplete="off" aria-label="Search perfumes or paste a Fragrantica link" />
+          <input id="search" type="search" placeholder="Search perfumes, or paste a Parfumo link" autocomplete="off" aria-label="Search perfumes or paste a Parfumo link" />
         </div>
         <div class="results" id="results" hidden></div>
         <div class="list-head queue-head"><span>Queue</span></div>
@@ -315,19 +313,25 @@ function hostConsoleView() {
     clearTimeout(debounce);
     debounce = setTimeout(() => {
       const query = searchInput.value;
-      const frag = query.match(FRAG_URL_RE);
-      if (frag) {
+      const parfumo = query.match(PARFUMO_URL_RE);
+      if (parfumo) {
         resultsEl.hidden = false;
-        resultsEl.innerHTML = `<button type="button" class="result" data-url="${esc(frag[0])}">
-            <span>${esc(titlecaseSlug(frag[2]))} <span class="brand">— ${esc(titlecaseSlug(frag[1]))} · from Fragrantica</span></span><span class="add">Add</span>
+        resultsEl.innerHTML = `<button type="button" class="result" data-url="${esc(parfumo[0])}">
+            <span>${esc(slugText(parfumo[2]))} <span class="brand">— ${esc(slugText(parfumo[1]))} · from Parfumo</span></span><span class="add">Add</span>
           </button>`;
+        return;
+      }
+      if (FRAG_URL_RE.test(query)) {
+        resultsEl.hidden = false;
+        resultsEl.innerHTML =
+          '<p class="sub no-results">Fragrantica blocks automatic lookups — find this perfume on parfumo.com and paste that link instead.</p>';
         return;
       }
       const hits = searchPerfumes(query);
       if (hits.length === 0 && norm(query).length >= 2 && searchIndex) {
         resultsEl.hidden = false;
         resultsEl.innerHTML =
-          '<p class="sub no-results">No matches — paste the perfume\'s Fragrantica page link here to add it.</p>';
+          '<p class="sub no-results">No matches — paste the perfume\'s Parfumo page link (parfumo.com) here to add it.</p>';
         return;
       }
       resultsEl.hidden = hits.length === 0;
@@ -341,7 +345,7 @@ function hostConsoleView() {
 
   // Fetch the page server-side, store it in the dataset, then queue it like a
   // normal search hit. It stays searchable for every future game.
-  async function addFromFragrantica(btn) {
+  async function addFromParfumo(btn) {
     btn.disabled = true;
     btn.querySelector('.add').textContent = 'Adding…';
     try {
@@ -371,7 +375,7 @@ function hostConsoleView() {
   resultsEl.addEventListener('click', (e) => {
     const btn = e.target.closest('.result');
     if (!btn) return;
-    if (btn.dataset.url) return addFromFragrantica(btn);
+    if (btn.dataset.url) return addFromParfumo(btn);
     send({ t: 'queue-add', id: Number(btn.dataset.id) });
     clearSearch();
   });

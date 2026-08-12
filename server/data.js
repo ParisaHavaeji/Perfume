@@ -45,11 +45,15 @@ export function searchIndexGzip() {
   return searchIndexGz;
 }
 
-let fidToId = null; // built from every shard on the first URL-add, then kept fresh
+// Slug casing drifts between Parfumo page editions and the TidyTuesday dump,
+// which also has old hyphenated slugs — compare case-blind with _ and - merged.
+const urlKey = (url) => url.replace(/^https?:\/\//i, '').replace(/\/$/, '').replace(/_/g, '-').toLowerCase();
 
-async function fidMap() {
-  if (!fidToId) {
-    fidToId = new Map();
+let urlToId = null; // built from every shard on the first URL-add, then kept fresh
+
+async function urlMap() {
+  if (!urlToId) {
+    urlToId = new Map();
     const maxShard = Math.floor(Math.max(0, searchIndex.length - 1) / SHARD_SIZE);
     for (let shardNo = 0; shardNo <= maxShard; shardNo++) {
       let shard;
@@ -59,16 +63,16 @@ async function fidMap() {
         continue;
       }
       for (const [id, entry] of Object.entries(shard)) {
-        if (entry.fid != null) fidToId.set(entry.fid, Number(id));
+        if (entry.url) urlToId.set(urlKey(entry.url), Number(id));
       }
     }
   }
-  return fidToId;
+  return urlToId;
 }
 
-/** Search-index entry {i, n, b, y, s} for a Fragrantica id already in the dataset, or null. */
-export async function findByFid(fid) {
-  const id = (await fidMap()).get(fid);
+/** Search-index entry {i, n, b, y, s} for a source page URL already in the dataset, or null. */
+export async function findByUrl(url) {
+  const id = (await urlMap()).get(urlKey(url));
   return id == null ? null : (searchIndex.find((e) => e.i === id) ?? null);
 }
 
@@ -76,14 +80,14 @@ const STRUCTURE_CHAR = { pyramid: 'p', flat: 'f', partial: 'x' };
 
 /**
  * Append a perfume to the live dataset: memory, search_index.json, and its
- * notes shard. Caller (fragrantica.js) serializes calls — no concurrent adds.
+ * notes shard. Caller (parfumo.js) serializes calls — no concurrent adds.
  * @returns {Promise<object>} the new search-index entry {i, n, b, y, s}
  */
-export async function addPerfume({ name, brand, year, structure, notes, fid }) {
+export async function addPerfume({ name, brand, year, structure, notes, url }) {
   const id = searchIndex.length;
   const shardNo = Math.floor(id / SHARD_SIZE);
   const shard = await loadShard(shardNo).catch(() => ({}));
-  shard[String(id)] = { notes, structure, name, brand, fid };
+  shard[String(id)] = { notes, structure, name, brand, url }; // url: bottle image via og:image
   shards.set(shardNo, Promise.resolve(shard));
   await writeFile(path.join(OUT_DIR, 'notes', `${shardNo}.json`), JSON.stringify(shard), 'utf8');
 
@@ -91,7 +95,7 @@ export async function addPerfume({ name, brand, year, structure, notes, fid }) {
   searchIndex.push(entry);
   await writeFile(SEARCH_INDEX_PATH, JSON.stringify(searchIndex), 'utf8');
   searchIndexGz = gzipSync(JSON.stringify(searchIndex));
-  if (fidToId) fidToId.set(fid, id);
+  if (urlToId) urlToId.set(urlKey(url), id);
   return entry;
 }
 
