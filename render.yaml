@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: smell-things
+    name: nose-game
     runtime: node
     plan: free
     buildCommand: npm ci
