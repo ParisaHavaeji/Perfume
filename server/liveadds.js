@@ -22,7 +22,7 @@ const GH_HEADERS = {
   authorization: `Bearer ${TOKEN}`,
   accept: 'application/vnd.github+json',
   'x-github-api-version': '2022-11-28',
-  'user-agent': 'nose-game',
+  'user-agent': 'smell-things',
 };
 
 /** Structure/notes fields from a {top, middle, base} dict (build_dataset.tiers_to_entry). */
