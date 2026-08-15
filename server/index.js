@@ -209,4 +209,4 @@ wss.on('connection', (ws) => {
 
 await Promise.all([initImageCache(), initData()]);
 await replayLiveAdds();
-server.listen(PORT, () => console.log(`nose-game listening on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`smell-things listening on http://localhost:${PORT}`));
