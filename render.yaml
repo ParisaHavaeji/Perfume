@@ -1,6 +1,8 @@
 services:
   - type: web
-    name: smell-things
+    # Stays nose-game on purpose: renaming here makes Render create a NEW
+    # service instead of renaming this one.
+    name: nose-game
     runtime: node
     plan: free
     buildCommand: npm ci
