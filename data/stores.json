@@ -1,0 +1,122 @@
+[
+  {
+    "id": "sephora",
+    "name": "Sephora",
+    "kind": "chain",
+    "area": "many LA locations",
+    "as_of": "2026-08",
+    "brands": []
+  },
+  {
+    "id": "ulta",
+    "name": "Ulta Beauty",
+    "kind": "chain",
+    "area": "many LA locations",
+    "as_of": "2026-08",
+    "brands": []
+  },
+  {
+    "id": "nordstrom-la",
+    "name": "Nordstrom",
+    "kind": "chain",
+    "area": "The Grove + Century City",
+    "as_of": "2026-08",
+    "brands": []
+  },
+  {
+    "id": "bloomingdales-la",
+    "name": "Bloomingdale's",
+    "kind": "chain",
+    "area": "Century City",
+    "as_of": "2026-08",
+    "brands": []
+  },
+  {
+    "id": "macys",
+    "name": "Macy's",
+    "kind": "chain",
+    "area": "many LA locations",
+    "as_of": "2026-08",
+    "brands": []
+  },
+  {
+    "id": "neiman-marcus-bh",
+    "name": "Neiman Marcus",
+    "kind": "chain",
+    "area": "Beverly Hills",
+    "as_of": "2026-08",
+    "brands": []
+  },
+  {
+    "id": "saks-bh",
+    "name": "Saks Fifth Avenue",
+    "kind": "chain",
+    "area": "Beverly Hills",
+    "as_of": "2026-08",
+    "brands": []
+  },
+  {
+    "id": "scentbar-la",
+    "name": "Scent Bar",
+    "kind": "boutique",
+    "area": "Beverly Blvd + DTLA + Studio City",
+    "as_of": "2026-08",
+    "brands_from_source": "luckyscent"
+  },
+  {
+    "id": "scentroom-la",
+    "name": "The Scent Room",
+    "kind": "boutique",
+    "area": "Los Angeles",
+    "as_of": "2026-08",
+    "brands": []
+  },
+  {
+    "id": "dsm-la",
+    "name": "Dover Street Market",
+    "kind": "boutique",
+    "area": "Arts District",
+    "as_of": "2026-08",
+    "brands": []
+  },
+  {
+    "id": "le-labo",
+    "name": "Le Labo",
+    "kind": "flagship",
+    "area": "5 LA boutiques",
+    "as_of": "2026-08",
+    "brands": ["Le Labo"]
+  },
+  {
+    "id": "ds-durga",
+    "name": "D.S. & Durga",
+    "kind": "flagship",
+    "area": "Abbot Kinney + Silver Lake",
+    "as_of": "2026-08",
+    "brands": ["D.S. & Durga"]
+  },
+  {
+    "id": "santa-maria-novella",
+    "name": "Santa Maria Novella",
+    "kind": "flagship",
+    "area": "Melrose Pl",
+    "as_of": "2026-08",
+    "brands": ["Santa Maria Novella"]
+  },
+  {
+    "id": "dries-van-noten",
+    "name": "Dries Van Noten",
+    "kind": "flagship",
+    "area": "La Cienega",
+    "as_of": "2026-08",
+    "brands": ["Dries Van Noten"]
+  },
+  {
+    "id": "elorea",
+    "name": "Elorea",
+    "kind": "flagship",
+    "area": "Chapman Plaza, Koreatown",
+    "as_of": "2026-08",
+    "brands": ["Elorea"]
+  }
+]

@@ -11,6 +11,7 @@ import { initData, searchIndexGzip } from './data.js';
 import { addFromUrl, AddPerfumeError } from './parfumo.js';
 import { replayLiveAdds } from './liveadds.js';
 import { initImageCache, serveImage } from './images.js';
+import { initSmellList, handleStores, handleNotesVocab, handleBrandsVocab, handleSmellList } from './smelllist.js';
 import { createRoom, getRoom, GameError, CODE_LENGTH, GAME_TITLE } from './rooms.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -80,7 +81,8 @@ async function serveStatic(res, file) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const { pathname } = new URL(req.url, 'http://localhost');
+  const url = new URL(req.url, 'http://localhost');
+  const { pathname } = url;
   try {
     if (req.method === 'GET' && pathname === '/') {
       return await serveStatic(res, 'index.html');
@@ -122,6 +124,23 @@ const server = http.createServer(async (req, res) => {
       const room = getRoom(pathname.slice('/api/games/'.length));
       if (!room) return sendJson(res, 404, { error: 'No such game. Check the link.' });
       return sendJson(res, 200, { code: room.code, title: GAME_TITLE });
+    }
+    // SMELL LIST — /list is deliberately 4 characters; CODE_PATTERN above
+    // swallows any 5-char alphanumeric path into game.html.
+    if (req.method === 'GET' && pathname === '/list') {
+      return await serveStatic(res, 'list.html');
+    }
+    if (req.method === 'GET' && pathname === '/api/stores') {
+      return handleStores(res);
+    }
+    if (req.method === 'GET' && pathname === '/api/notes-vocab') {
+      return handleNotesVocab(res);
+    }
+    if (req.method === 'GET' && pathname === '/api/brands-vocab') {
+      return handleBrandsVocab(res);
+    }
+    if (req.method === 'GET' && pathname === '/api/smell-list') {
+      return await handleSmellList(url, res);
     }
     if (req.method === 'GET') {
       return await serveStatic(res, pathname.slice(1));
@@ -208,5 +227,8 @@ wss.on('connection', (ws) => {
 });
 
 await Promise.all([initImageCache(), initData()]);
+// smelllist registers its live-add hook before replay, so replayed live adds
+// flow through it; its boot heap measurement must also precede replayLiveAdds.
+await initSmellList();
 await replayLiveAdds();
 server.listen(PORT, () => console.log(`smell-things listening on http://localhost:${PORT}`));

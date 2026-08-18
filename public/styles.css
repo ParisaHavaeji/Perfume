@@ -70,6 +70,7 @@ h1.title { margin: 0 0 10px; text-wrap: balance; }
 .field.invalid input { border-bottom-color: var(--ink); }
 
 .btn, .ghost { display: inline-block; cursor: pointer; }
+.btn[hidden], .ghost[hidden] { display: none; } /* display:inline-block would otherwise beat the hidden attribute */
 .btn {
   border: 1px solid var(--ink);
   background: var(--bg); color: var(--ink);
@@ -117,7 +118,10 @@ h1.title { margin: 0 0 10px; text-wrap: balance; }
 .search-box input {
   width: 100%; border: none; background: transparent; color: var(--ink);
   font: inherit; text-transform: inherit; padding: 4px 0; min-width: 0;
+  -webkit-appearance: none; appearance: none; border-radius: 0; /* WebKit rounds type=search */
 }
+.search-box input::-webkit-search-decoration,
+.search-box input::-webkit-search-cancel-button { -webkit-appearance: none; }
 .search-box input:focus { outline: none; }
 .search-box input::placeholder { color: var(--faint); }
 
@@ -125,9 +129,8 @@ h1.title { margin: 0 0 10px; text-wrap: balance; }
 .result {
   display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
   width: 100%; text-align: left; background: none; border: none; color: var(--ink);
-  padding: 10px 0; border-bottom: 1px solid var(--faint); cursor: pointer;
+  padding: 10px 0; cursor: pointer;
 }
-.result:last-child { border-bottom: none; }
 .result:hover, .result:focus-visible { background: var(--panel); outline: none; }
 .result .brand { color: var(--faint); }
 .result .add { white-space: nowrap; }
@@ -255,3 +258,123 @@ body.has-hostbar main { padding-bottom: 140px; }
 }
 .toast.show { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+
+/* ---------- homepage chooser ---------- */
+.chooser { display: flex; flex-direction: column; gap: 24px; }
+.chooser .btn { text-align: center; }
+.chooser .sub { margin: 8px 0 0; }
+
+/* ---------- smell list ---------- */
+.list-page { padding-top: 26px; }
+.list-controls { display: flex; flex-direction: column; gap: 20px; }
+
+/* three side-by-side finder fields (location / I like / I avoid);
+   stack to one column on narrow screens. Label and input share one line —
+   black label, dimmed placeholder, no hairline under the input. */
+.finder-row { display: flex; flex-direction: column; gap: 24px; }
+.finder-field { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 8px 10px; }
+.finder-label { display: block; color: var(--ink); }
+.finder-field .search-box { border-bottom: none; padding-bottom: 0; }
+.finder-field .filter-chips { grid-column: 1 / -1; }
+.ta-anchor { position: relative; } /* dropdown hangs off the search bar, not the whole field */
+@media (min-width: 640px) {
+  .finder-row { flex-direction: row; align-items: flex-start; gap: 40px; }
+  .finder-field { flex: 1; min-width: 0; }
+}
+
+.chip .area { color: var(--faint); }
+.honesty { color: var(--faint); margin: -8px 0 0; }
+
+/* typeahead — the game's .search-box/.results shell with taller tap targets;
+   floats over whatever follows so it never pushes the layout around */
+.ta-results {
+  margin-bottom: 0; position: absolute; top: 100%; left: 0; right: 0; z-index: 5;
+  background: var(--bg); border: 1px solid var(--faint); border-top: none;
+  max-height: 320px; overflow-y: auto;
+}
+.ta-head { color: var(--faint); padding: 10px 12px 4px; }
+.ta-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  width: 100%; min-height: 44px; padding: 0 12px; border: none;
+  background: none; color: var(--ink); font: inherit; text-transform: inherit;
+  text-align: left; cursor: pointer;
+}
+.ta-row:hover, .ta-row:focus-visible { background: var(--panel); outline: none; }
+.ta-name { min-width: 0; overflow-wrap: anywhere; }
+.ta-sub { color: var(--faint); }
+.ta-count { color: var(--faint); white-space: nowrap; }
+.ta-results .no-results { padding: 10px 12px; margin: 0; }
+
+/* active filters: a plain text list stacked under each field, no boxes or
+   fills — the faint × is the removal affordance */
+.filter-chips { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.filter-chips:empty { display: none; }
+.filter-chips .chip { margin: 0; padding: 3px 0; text-align: left; }
+.filter-chips .chip::after { content: '×'; margin-left: 6px; color: var(--faint); }
+.filter-chips .chip:hover::after { color: var(--ink); }
+
+.count-row {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 16px;
+  padding: 10px 0;
+}
+.smelled-n { color: var(--faint); }
+.count-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.sort3 { display: inline-flex; align-items: center; gap: 4px; }
+.sort3 .sep { color: var(--faint); }
+.sort3 button { background: none; border: none; padding: 8px 2px; color: var(--faint); cursor: pointer; }
+.sort3 button.on { color: var(--ink); }
+.tog { background: none; border: none; padding: 8px 6px; color: var(--faint); cursor: pointer; }
+.tog[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+.banner { max-width: 680px; margin: 20px auto 0; border: 1px dashed var(--faint); color: var(--faint); text-align: center; padding: 8px 10px; }
+
+.surprise-wrap { position: relative; margin-bottom: 34px; }
+.surprise-wrap .x {
+  position: absolute; top: 14px; right: 0; background: none; border: none;
+  color: var(--faint); font-size: 14px; padding: 6px 10px; cursor: pointer;
+}
+.surprise-wrap .x:hover { color: var(--ink); }
+
+/* result cards — the reveal layout, miniaturized. Whitespace does the
+   separating between perfumes, not hairlines. */
+.cards { display: flex; flex-direction: column; gap: 34px; }
+.cards.hide-smelled .card.smelled { display: none; }
+.card {
+  display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+}
+.card-bottle { position: relative; width: min(140px, 40vw); aspect-ratio: 3 / 4; }
+.card-bottle.big { width: min(220px, 60vw); }
+.card-bottle .ph {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--faint); color: var(--faint); font-size: 14px;
+}
+.card-bottle img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; background: var(--bg); opacity: 0;
+}
+.card-bottle img.ok { opacity: 1; }
+.card-bottle:has(img.ok) .ph { visibility: hidden; } /* keep the placeholder's border from ghosting through dimmed images */
+.card-name { margin: 0; text-wrap: balance; }
+.card-meta { margin: -4px 0 6px; color: var(--faint); }
+.card .nrun { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 10px; max-width: 440px; }
+.nrun .tmark { color: var(--faint); }
+.nrun .dim { color: var(--faint); }
+.card .tog { color: var(--ink); }
+.card .tog[aria-pressed="true"] { background: none; color: var(--faint); }
+.card:only-child { grid-column: 1 / -1; }
+.card.smelled .card-name { color: var(--faint); text-decoration: line-through; text-decoration-thickness: 1px; }
+.card.smelled .card-meta, .card.smelled .nrun .nchip { color: var(--faint); }
+.card.smelled .card-bottle img.ok { opacity: 0.35; }
+.card.smelled .card-bottle .ph { opacity: 0.5; }
+
+.empty { text-align: center; padding: 46px 0; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.empty .filter-chips { align-items: center; }
+.empty p { margin: 0; }
+.more-row { display: flex; justify-content: center; align-items: center; gap: 28px; padding: 28px 0 10px; }
+
+@media (min-width: 700px) {
+  .cards { display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 40px; row-gap: 40px; }
+}
+@media (min-width: 1000px) {
+  .cards { grid-template-columns: repeat(3, 1fr); }
+}

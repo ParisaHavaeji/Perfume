@@ -10,6 +10,7 @@ Steps:
 import json
 import os
 import re
+from bisect import bisect_right
 from collections import Counter, defaultdict
 
 from textnorm import ascii_fold, brand_key, norm_key
@@ -164,6 +165,13 @@ def clean_names(perfumes):
 
 # ------------------------------------------------------------------- brands
 
+# Hand aliases where the most common spelling across sources isn't the right
+# display form (cf. DISPLAY_OVERRIDES for notes). Keyed by brand_key.
+BRAND_DISPLAY_OVERRIDES = {
+    "dsdurga": "D.S. & Durga",
+}
+
+
 def unify_brands(perfumes):
     groups = defaultdict(Counter)
     for p in perfumes:
@@ -181,6 +189,11 @@ def unify_brands(perfumes):
     canon = {k: c.most_common(1)[0][0] for k, c in groups.items() if k not in alias}
     for k, target in alias.items():
         canon[k] = canon[target]
+    for k, name in BRAND_DISPLAY_OVERRIDES.items():
+        if k in canon:
+            canon[k] = name
+        else:
+            print(f"brand override key not in dataset: {k}")
 
     fixed = 0
     for p in perfumes:
@@ -189,6 +202,114 @@ def unify_brands(perfumes):
         p["brand"] = best
     multi = sum(1 for k, c in groups.items() if k not in alias and len(c) > 1)
     print(f"brand spellings unified: {fixed} entries across {multi} multi-spelling brands")
+
+
+# ------------------------------------------------------------------ dedup map
+
+# Concentration values that mark the same juice in another strength or delivery
+# format; rows differing only by these merge into one SMELL LIST card. A closed
+# list on purpose: any other value (Elixir, Intense, Extrême, Absolu, Attar, …)
+# is a flanker with its own composition and stays its own card.
+MERGEABLE_CONC_KEYS = {norm_key(c) for c in [
+    "Eau de Toilette", "Eau de Parfum", "Parfum", "Perfume", "Pure Perfume",
+    "Pure Parfum", "Extrait", "Extrait de Parfum", "Parfum de Toilette",
+    "Esprit de Parfum", "Eau de Cologne", "Cologne", "Toilet Water",
+    "Perfume Oil", "Huile de Parfum", "Huile Parfum", "Solid Perfume",
+    "Parfum Solide", "Profumo Solido", "Solid Fragrance", "Concreta",
+    "Liquid Balm", "Hair Mist", "Brume Cheveux", "Parfum Cheveux",
+    "Hair Perfume", "Hair Fragrance", "Body Mist", "Body Spray",
+    "Body Splash", "Fragrance Mist", "All-Over Spray", "Brume Parfumee",
+    "After Shave", "After-Shave Lotion", "Lotion Apres-Rasage",
+    "Apres-Rasage", "Rasierwasser", "Lozione Dopobarba",
+]}
+
+# Name suffixes that mark a delivery-format twin of an existing base perfume
+# ("Neroli 36 Perfume Oil" next to "Neroli 36"). Plain concentrations never
+# belong here: a page named "X Eau de Parfum" is a distinct flanker.
+TIER2_FORMAT_KEYS = sorted({norm_key(s) for s in [
+    "Perfume Oil", "Huile de Parfum", "Solid Perfume", "Liquid Balm",
+    "Hair Mist", "Body Mist", "Body Spray", "Hair & Body Mist",
+    "Hair and Body Mist", "Fragrance Mist", "Hair Perfume",
+    "Hair Fragrance", "Body Splash",
+]}, key=len, reverse=True)
+
+SLUG_YEAR = re.compile(r"(?:^|[_-])((?:18|19|20)\d\d)(?=[_-]|$)")
+
+
+def slug_year(p):
+    """Release year embedded in a Parfumo URL slug. The year FIELD on parfumo
+    rows is unreliable (poisoned unauthenticated fetches randomize it); the
+    slug is page identity and can't be."""
+    if p["source"] != "parfumo" or not p.get("url"):
+        return None
+    years = SLUG_YEAR.findall(p["url"].rstrip("/").rsplit("/", 1)[-1])
+    return int(years[-1]) if years else None  # a name-embedded number ("1881") comes first
+
+
+def split_by_era(rows):
+    """Split same-name rows whose Parfumo slugs pin different release years
+    (Gucci pour Homme 1976 vs 2003). Slug-less rows attach to the nearest
+    year via their own year field (tie -> older), else to the subgroup
+    holding the lowest placed id."""
+    slug = {p["id"]: slug_year(p) for p in rows}
+    eras = sorted({y for y in slug.values() if y})
+    if len(eras) < 2:
+        return [rows]
+    subs = {y: [] for y in eras}
+    unplaced = []
+    for p in rows:
+        y = slug[p["id"]]
+        if y is None and p["year"] is not None:
+            y = min(eras, key=lambda e: (abs(e - p["year"]), e))
+        if y is None:
+            unplaced.append(p)
+        else:
+            subs[y].append(p)
+    if unplaced:
+        first = min((min(q["id"] for q in ps), y) for y, ps in subs.items() if ps)[1]
+        subs[first].extend(unplaced)
+    return [subs[y] for y in eras]
+
+
+def build_dedup(perfumes):
+    """Map duplicate-variant id -> canonical id for the SMELL LIST layer.
+    Suppressed rows keep their ids everywhere (shards, images, game); only
+    /list hides them. Tier 1: same brand + name key. Tier 2: delivery-format
+    name suffix folding into an existing same-brand base. Groups subdivide by
+    non-mergeable concentration and by slug-pinned era before picking."""
+    groups = defaultdict(list)
+    for p in perfumes:
+        groups[(p["brand"], norm_key(p["name"]))].append(p)
+
+    fmt_suffixed = set()
+    for brand, nk in sorted(groups):
+        for fmt in TIER2_FORMAT_KEYS:
+            if nk.endswith(fmt) and len(nk) > len(fmt) and (brand, nk[: -len(fmt)]) in groups:
+                for p in groups.pop((brand, nk)):
+                    fmt_suffixed.add(p["id"])
+                    groups[(brand, nk[: -len(fmt)])].append(p)
+                break
+
+    suppress = {}
+    for members in groups.values():
+        subs = defaultdict(list)
+        for p in members:
+            ck = norm_key(p["concentration"] or "")
+            subs[ck if ck and ck not in MERGEABLE_CONC_KEYS else ""].append(p)
+        for rows in subs.values():
+            for era_rows in split_by_era(rows):
+                if len(era_rows) < 2:
+                    continue
+                canon = min(era_rows, key=lambda p: (
+                    p["id"] in fmt_suffixed,  # the surviving card must carry the base name
+                    p["rating"] is None or (p["ratingCount"] or 0) < 5,
+                    p["source"] != "fragrantica",
+                    p["id"],
+                ))
+                for p in era_rows:
+                    if p is not canon:
+                        suppress[p["id"]] = canon["id"]
+    return suppress
 
 
 # ---------------------------------------------------------------- output
@@ -262,8 +383,43 @@ def emit(perfumes):
     with open(os.path.join(OUT, "notes_vocab.json"), "w", encoding="utf-8") as f:
         json.dump(vocab, f, ensure_ascii=False)
 
+    # find_meta.json (server-only): per-id rating meta for the SMELL LIST page.
+    # null = no rating (all luckyscent); else [raw, scale_max, percentile] where the
+    # percentile is per-source rank 0-1000 over gated entries (ratingCount >= 5),
+    # p = round(1000 * |{gated same-source entries with rating <= r}| / N),
+    # and null below the gate — a 5.0 with 3 votes must not outrank a 4.6 with 9,000.
+    scales = {"fragrantica": 5, "parfumo": 10}
+    gated = {src: sorted(p["rating"] for p in perfumes if p["source"] == src
+                         and p["rating"] is not None and (p["ratingCount"] or 0) >= 5)
+             for src in scales}
+    meta = []
+    for p in perfumes:
+        s = scales.get(p["source"])
+        r = p["rating"]
+        if s is None or r is None:
+            meta.append(None)
+        elif (p["ratingCount"] or 0) >= 5:
+            rs = gated[p["source"]]
+            meta.append([r, s, round(1000 * bisect_right(rs, r) / len(rs))])
+        else:
+            meta.append([r, s, None])
+    with open(os.path.join(OUT, "find_meta.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False)
+
+    # dedup.json (server-only): suppressed variant id -> canonical id, plus the
+    # suppressed ids whose notes still count for their canonical (unionNotes).
+    # Parfumo members are excluded from the union until the poisoning call is
+    # made — their note lists may carry fabricated decoys.
+    dedup = build_dedup(perfumes)
+    union = [i for i in sorted(dedup) if perfumes[i]["source"] != "parfumo"]
+    with open(os.path.join(OUT, "dedup.json"), "w", encoding="utf-8") as f:
+        json.dump({"suppress": {str(i): dedup[i] for i in sorted(dedup)},
+                   "unionNotes": union}, f, separators=(",", ":"))
+    print(f"dedup.json: {len(dedup)} variant rows suppressed, {len(union)} note-unioned")
+
     for label, path in [("search_index.json", os.path.join(OUT, "search_index.json")),
-                        ("notes_vocab.json", os.path.join(OUT, "notes_vocab.json"))]:
+                        ("notes_vocab.json", os.path.join(OUT, "notes_vocab.json")),
+                        ("find_meta.json", os.path.join(OUT, "find_meta.json"))]:
         print(f"{label}: {os.path.getsize(path) / 1e6:.2f} MB")
     shard_bytes = sum(os.path.getsize(os.path.join(OUT, "notes", fn))
                       for fn in os.listdir(os.path.join(OUT, "notes")))

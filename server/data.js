@@ -45,6 +45,16 @@ export function searchIndexGzip() {
   return searchIndexGz;
 }
 
+// Accessor, not a direct export — initData reassigns the binding.
+export const getSearchIndex = () => searchIndex;
+
+const perfumeAddedHooks = [];
+
+/** Subscribe to live adds; fn(id, entry, indexEntry) runs at the end of addPerfume. */
+export function onPerfumeAdded(fn) {
+  perfumeAddedHooks.push(fn);
+}
+
 // Slug casing drifts between Parfumo page editions and the TidyTuesday dump,
 // which also has old hyphenated slugs — compare case-blind with _ and - merged.
 const urlKey = (url) => url.replace(/^https?:\/\//i, '').replace(/\/$/, '').replace(/_/g, '-').toLowerCase();
@@ -96,6 +106,7 @@ export async function addPerfume({ name, brand, year, structure, notes, url }) {
   await writeFile(SEARCH_INDEX_PATH, JSON.stringify(searchIndex), 'utf8');
   searchIndexGz = gzipSync(JSON.stringify(searchIndex));
   if (urlToId) urlToId.set(urlKey(url), id);
+  for (const fn of perfumeAddedHooks) fn(id, shard[String(id)], entry);
   return entry;
 }
 
