@@ -4,3 +4,7 @@ node_modules/
 cache/
 PLAN.md
 .claude/
+feature-a-embeddings.md
+feature-b-telemetry.md
+feature-c-feedback.md
+feature-d-smell-list.md

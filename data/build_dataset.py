@@ -6,7 +6,9 @@ Sources, in priority order (first one to claim a brand+name wins):
   3. Luckyscent (raw/luckyscent_notes.jsonl) — flat notes from our own crawl
   4. Fragrantica refresh (raw/fragrantica_new.jsonl) — 2024+ releases, own crawl
      via fragrantica_refresh.py (last so it only fills the gap)
-  5. Parfumo live adds (raw/parfumo_new.jsonl) — pages the game host pasted
+  5. Parfumo gap crawl (raw/parfumo_gap.jsonl) — 2024+ releases Fragrantica
+     won't serve us, crawled from Parfumo via parfumo_gap.py
+  6. Parfumo live adds (raw/parfumo_new.jsonl) — pages the game host pasted
      mid-game, fetched by server/parfumo.js
 
 Run clean_dataset.py afterwards to normalize and emit the browser-ready files.
@@ -181,6 +183,40 @@ def load_fragrantica_refresh():
     return out
 
 
+def load_parfumo_gap():
+    """Batch gap-fill crawled from Parfumo (parfumo_gap.py, raw/parfumo_gap.jsonl)."""
+    path = os.path.join(RAW, "parfumo_gap.jsonl")
+    if not os.path.exists(path):
+        return []
+    out = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            rec = json.loads(line)
+            notes = rec.get("notes")
+            if not notes:
+                continue
+            if "flat" in notes:
+                structure, notes = "flat", {"flat": notes["flat"]}
+            else:
+                structure, notes = tiers_to_entry(notes)
+            out.append(
+                {
+                    "name": rec["name"],
+                    "brand": rec["brand"],
+                    "year": rec["year"],
+                    "gender": rec.get("gender"),
+                    "source": "parfumo",
+                    "structure": structure,
+                    "notes": notes,
+                    "url": rec["url"],  # for og:image lookup
+                    "concentration": None,
+                    "rating": rec.get("rating"),
+                    "ratingCount": rec.get("votes"),
+                }
+            )
+    return out
+
+
 def load_parfumo_new():
     """Live gap-fill adds from game night (server/parfumo.js, raw/parfumo_new.jsonl)."""
     path = os.path.join(RAW, "parfumo_new.jsonl")
@@ -228,7 +264,7 @@ def dedupe(perfumes):
 
 def main():
     # the refresh goes last so it only adds what the older dumps are missing
-    sources = [load_fragrantica(), load_parfumo(), load_luckyscent(), load_fragrantica_refresh(), load_parfumo_new()]
+    sources = [load_fragrantica(), load_parfumo(), load_luckyscent(), load_fragrantica_refresh(), load_parfumo_gap(), load_parfumo_new()]
     for chunk in sources:
         if chunk:
             print(f"{chunk[0]['source']}: {len(chunk)} with notes")
