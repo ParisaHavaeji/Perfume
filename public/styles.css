@@ -265,25 +265,35 @@ body.has-hostbar main { padding-bottom: 140px; }
 .chooser .sub { margin: 8px 0 0; }
 
 /* ---------- smell list ---------- */
-.list-page { padding-top: 26px; }
+/* 19px puts the finder line 36px below SMELL LIST (glyph to glyph); the
+   countline's -8px margin (see .countline) makes it sit the same 36px
+   below the finder line. */
+.list-page { padding-top: 19px; }
 .list-controls { display: flex; flex-direction: column; gap: 20px; }
 
 /* three side-by-side finder fields (location / I like / I avoid);
    stack to one column on narrow screens. Label and input share one line —
-   black label, dimmed placeholder, no hairline under the input. */
+   black label, dimmed placeholder, no hairline under the input.
+   The first column is sized so the middle field ("I like") starts at the
+   same x as the centered SMELL LIST wordmark: 50% minus half the wordmark
+   width (~28.5px) minus the 40px gap. */
 .finder-row { display: flex; flex-direction: column; gap: 24px; }
 .finder-field { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 8px 10px; }
 .finder-label { display: block; color: var(--ink); }
 .finder-field .search-box { border-bottom: none; padding-bottom: 0; }
-.finder-field .filter-chips { grid-column: 1 / -1; }
+/* chips line up with the search bar's start (column 2), not the label */
+.finder-field .filter-chips { grid-column: 2; }
 .ta-anchor { position: relative; } /* dropdown hangs off the search bar, not the whole field */
 @media (min-width: 640px) {
-  .finder-row { flex-direction: row; align-items: flex-start; gap: 40px; }
-  .finder-field { flex: 1; min-width: 0; }
+  .finder-row {
+    display: grid;
+    grid-template-columns: calc(50% - 68.5px) 1fr 1fr;
+    align-items: start; gap: 40px;
+  }
+  .finder-field { min-width: 0; }
 }
 
 .chip .area { color: var(--faint); }
-.honesty { color: var(--faint); margin: -8px 0 0; }
 
 /* typeahead — measured off the Heliot Emil desktop menu: bare 10px/14px lines
    with a pure 10px gap between them (no row padding), the count pushed to the
@@ -319,16 +329,20 @@ body.has-hostbar main { padding-bottom: 140px; }
 .ta-results .no-results { padding: 0; margin: 0; }
 
 /* active filters: a plain text list stacked under each field, no boxes or
-   fills — the faint × is the removal affordance */
-.filter-chips { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+   fills — the faint × is the removal affordance. Bare 14px lines on a 10px
+   gap, the same rhythm as the typeahead rows above them. */
+.filter-chips { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .filter-chips:empty { display: none; }
-.filter-chips .chip { margin: 0; padding: 3px 0; text-align: left; }
+.filter-chips .chip { margin: 0; padding: 0; text-align: left; }
 .filter-chips .chip::after { content: '×'; margin-left: 6px; color: var(--faint); }
 .filter-chips .chip:hover::after { color: var(--ink); }
 
-/* The count line IS the controls: underlined words are buttons. Vertical
-   padding on the inline buttons grows the tap target without moving the line. */
-.countline { margin: 0; padding: 10px 0; }
+/* The count line IS the controls: underlined words are buttons. The inline
+   buttons' vertical padding grows the tap target but also inflates the line
+   box, pushing the text down; the -8px top margin cancels that so the
+   countline sits 36px below the finder line (glyph to glyph) — the same
+   space as between SMELL LIST and the finder line. */
+.countline { margin: -8px 0 0; padding: 10px 0; }
 .countline .lnk {
   background: none; border: none; padding: 8px 1px; margin: 0; color: var(--ink); cursor: pointer;
   text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px;
@@ -348,7 +362,7 @@ body.has-hostbar main { padding-bottom: 140px; }
 
 /* result cards — the reveal layout, miniaturized. Whitespace does the
    separating between perfumes, not hairlines. */
-.cards { display: flex; flex-direction: column; gap: 34px; }
+.cards { display: flex; flex-direction: column; gap: 64px; }
 .cards.hide-smelled .card.smelled { display: none; }
 .card {
   display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
@@ -367,7 +381,20 @@ body.has-hostbar main { padding-bottom: 140px; }
 .card-bottle:has(img.ok) .ph { visibility: hidden; } /* keep the placeholder's border from ghosting through dimmed images */
 .card-name { margin: 0; text-wrap: balance; }
 .card-meta { margin: -4px 0 6px; color: var(--faint); }
-.card .nrun { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 10px; max-width: 440px; }
+/* one line per tier (top / middle / base); a long tier still wraps within its row.
+   Grid rows stretch every card to the row's tallest (longest notes list), so the
+   equal auto margins park SMELL on the shared bottom edge and center the notes
+   in whatever room that card has between its rating and its SMELL. */
+.card .nrun {
+  display: grid; grid-template-columns: max-content 1fr; align-items: baseline;
+  gap: 8px 20px; max-width: 440px; text-align: left; margin: auto 0;
+}
+/* each row contributes its tier word and its notes straight to the grid, so the
+   widest word (middle) sizes the label column and every notes line starts flush
+   on the same edge to its right */
+.nrun-row { display: contents; }
+.nrow-notes { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 3px 10px; }
+.nrow-notes:first-child { grid-column: 1 / -1; } /* untiered card: no label, full width */
 .nrun .tmark { color: var(--faint); }
 .nrun .dim { color: var(--faint); }
 .card .tog { color: var(--ink); }
@@ -384,7 +411,7 @@ body.has-hostbar main { padding-bottom: 140px; }
 .more-row { display: flex; justify-content: center; align-items: center; gap: 28px; padding: 28px 0 10px; }
 
 @media (min-width: 700px) {
-  .cards { display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 40px; row-gap: 40px; }
+  .cards { display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 40px; row-gap: 64px; }
 }
 @media (min-width: 1000px) {
   .cards { grid-template-columns: repeat(3, 1fr); }

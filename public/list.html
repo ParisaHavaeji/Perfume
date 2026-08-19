@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <!-- No maximum-scale here on purpose: pinch-zoom matters when squinting at a shelf. -->
+  <!-- No maximum-scale here on purpose: pinch-zoom matters when squinting at a shelf.
+       list.js adds the cap on iOS only, where it kills the input-focus auto-zoom
+       without blocking pinch; on Android it would block pinch, so it stays off. -->
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Smell List — Smell Things</title>
   <link rel="stylesheet" href="/styles.css" />
@@ -44,7 +46,6 @@
             <div class="filter-chips" id="chips-avoid"></div>
           </div>
         </div>
-        <p class="honesty" id="honesty" hidden></p>
         <p class="countline" id="count"></p>
       </section>
       <p class="banner" id="banner" hidden>Cached results</p>

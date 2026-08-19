@@ -120,6 +120,22 @@
     "brands": ["Malin+Goetz"]
   },
   {
+    "id": "diptyque",
+    "name": "Diptyque",
+    "kind": "flagship",
+    "area": "Larchmont + The Grove + Beverly Hills + Palisades",
+    "as_of": "2026-08",
+    "brands": ["Diptyque"]
+  },
+  {
+    "id": "byredo",
+    "name": "Byredo",
+    "kind": "flagship",
+    "area": "Melrose Ave, West Hollywood",
+    "as_of": "2026-08",
+    "brands": ["Byredo"]
+  },
+  {
     "id": "elorea",
     "name": "Elorea",
     "kind": "flagship",

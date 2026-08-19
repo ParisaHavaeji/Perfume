@@ -4,11 +4,20 @@
 // file owns filter state, the URL round-trip, and last-good offline caching.
 'use strict';
 
+// iOS Safari auto-zooms any focused input under 16px, and ours are 10px by
+// design. Capping the viewport scale suppresses only that auto-zoom on iOS —
+// pinch still works there (ignored for gestures since iOS 10). Android honors
+// the cap for pinch too, so it stays off everywhere else; see list.html.
+if (/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) /* iPadOS reports as Mac */) {
+  document.querySelector('meta[name="viewport"]')
+    .setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1');
+}
+
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const norm = (s) => s.trim().toLowerCase(); // mirrors server/data.js norm
 const el = (id) => document.getElementById(id);
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const KINDS = [['chain', 'Department'], ['boutique', 'Niche'], ['flagship', 'Flagship']];
 const KIND_LABEL = new Map(KINDS);
 const SORTS = [['pop', 'most popular'], ['rating', 'best rated'], ['year', 'newest']];
@@ -154,19 +163,6 @@ function syncUrl() {
 
 // ---- rendering: controls ----------------------------------------------------
 
-function fmtAsOf(v) {
-  const [y, m] = String(v).split('-').map(Number);
-  return `${MONTHS[(m || 1) - 1]} ${y}`;
-}
-
-function renderHonesty() {
-  const s = F.store ? storeById.get(F.store) : null;
-  const h = el('honesty');
-  h.hidden = !s || s.kind === 'flagship'; // nothing under ANYWHERE — nothing is scoped
-  if (h.hidden) return;
-  h.textContent = `Carried brands, ${fmtAsOf(s.as_of)} — not live stock`;
-}
-
 function chip(kind, v, label) {
   return `<button type="button" class="chip" data-rm="${kind}" data-v="${esc(v)}">${label ?? esc(v)}</button>`;
 }
@@ -211,7 +207,6 @@ function renderCount() {
 }
 
 function renderControls() {
-  renderHonesty();
   el('chips-location').innerHTML = locationChipHtml();
   el('chips-want').innerHTML = wantChipsHtml();
   el('chips-avoid').innerHTML = avoidChipsHtml();
@@ -226,8 +221,8 @@ function cardHtml(r, big) {
   const run = [];
   for (const [tier, arr] of Object.entries(r.notes ?? {})) {
     if (!Array.isArray(arr) || !arr.length) continue;
-    if (tier !== 'flat') run.push(`<span class="tmark">${esc(tier)} ·</span>`);
-    for (const n of arr) run.push(`<span class="nchip${wantSet.has(norm(n)) ? '' : ' dim'}">${esc(n)}</span>`);
+    const chips = arr.map((n) => `<span class="nchip${wantSet.has(norm(n)) ? '' : ' dim'}">${esc(n)}</span>`).join('');
+    run.push(`<div class="nrun-row">${tier !== 'flat' ? `<span class="tmark">${esc(tier)}</span>` : ''}<div class="nrow-notes">${chips}</div></div>`);
   }
   const rating = r.rating ? `${r.rating.v.toFixed(1)}/${r.rating.of}` : '';
   const meta = [r.year, rating].filter(Boolean).join(' · ');
@@ -460,7 +455,9 @@ function renderTypeahead(field) {
     const bVocab = scopedBrandsVocab ?? brandsVocab;
     const nCount = scopedNoteCountByNorm ?? noteCountByNorm;
     const bCount = scopedBrandCount ?? brandCount;
-    const noteCap = t ? 8 : 3;
+    // With a store picked the vocab is scoped to its shelf, so browse mode can
+    // afford a deeper list — the counts are all real matches there.
+    const noteCap = t || F.store ? 8 : 3;
     const brandCap = t ? 5 : 3;
     const notes = [];
     if (!t && field === 'avoid') {
@@ -469,6 +466,15 @@ function renderTypeahead(field) {
       for (const name of DEFAULT_AVOID_NOTES) {
         const count = nCount.get(norm(name));
         if (count) notes.push([name, count]);
+      }
+      // At a store, pad the curated picks out with its own top notes.
+      if (F.store) {
+        const seen = new Set(notes.map(([name]) => norm(name)));
+        for (const [name, count] of nVocab) {
+          if (seen.has(norm(name))) continue;
+          notes.push([name, count]);
+          if (notes.length >= noteCap) break;
+        }
       }
     } else {
       for (const [name, count] of nVocab) {
