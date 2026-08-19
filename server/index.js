@@ -134,10 +134,10 @@ const server = http.createServer(async (req, res) => {
       return handleStores(res);
     }
     if (req.method === 'GET' && pathname === '/api/notes-vocab') {
-      return handleNotesVocab(res);
+      return handleNotesVocab(url, res);
     }
     if (req.method === 'GET' && pathname === '/api/brands-vocab') {
-      return handleBrandsVocab(res);
+      return handleBrandsVocab(url, res);
     }
     if (req.method === 'GET' && pathname === '/api/smell-list') {
       return await handleSmellList(url, res);

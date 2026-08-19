@@ -11,7 +11,7 @@ const el = (id) => document.getElementById(id);
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const KINDS = [['chain', 'Department'], ['boutique', 'Niche'], ['flagship', 'Flagship']];
 const KIND_LABEL = new Map(KINDS);
-const SORTS = [['pop', 'Popular'], ['rating', 'Rating'], ['year', 'New']];
+const SORTS = [['pop', 'most popular'], ['rating', 'best rated'], ['year', 'newest']];
 // The three finder fields: each owns its own search box, typeahead dropdown,
 // and chip row. Location is a single-select (F.store); I like / I avoid are
 // tag lists mixing notes and brands.
@@ -79,13 +79,18 @@ async function getJson(url, cacheKey) {
   }
 }
 
-function queryParams(offset, limit) {
+function filterParams() {
   const p = new URLSearchParams();
   if (F.store) p.append('store', F.store);
   for (const b of F.brands) p.append('brand', b);
   for (const b of F.avoidBrands) p.append('avoidBrand', b);
   for (const w of F.wants) p.append('want', w);
   for (const a of F.avoids) p.append('avoid', a);
+  return p;
+}
+
+function queryParams(offset, limit) {
+  const p = filterParams();
   if (F.sort !== 'pop') p.append('sort', F.sort);
   p.append('offset', String(offset));
   p.append('limit', String(limit));
@@ -141,12 +146,7 @@ async function runQuery(append) {
 // ---- URL round-trip ---------------------------------------------------------
 
 function syncUrl() {
-  const p = new URLSearchParams();
-  if (F.store) p.append('store', F.store);
-  for (const b of F.brands) p.append('brand', b);
-  for (const b of F.avoidBrands) p.append('avoidBrand', b);
-  for (const w of F.wants) p.append('want', w);
-  for (const a of F.avoids) p.append('avoid', a);
+  const p = filterParams();
   if (F.sort !== 'pop') p.append('sort', F.sort);
   const qs = p.toString();
   history.replaceState(null, '', qs ? `/list?${qs}` : '/list');
@@ -162,11 +162,9 @@ function fmtAsOf(v) {
 function renderHonesty() {
   const s = F.store ? storeById.get(F.store) : null;
   const h = el('honesty');
-  h.hidden = !s; // nothing under ANYWHERE — nothing is scoped
-  if (!s) return;
-  h.textContent = s.kind === 'flagship'
-    ? `Flagship — full ${s.name} line, not live stock`
-    : `Carried brands, ${fmtAsOf(s.as_of)} — not live stock`;
+  h.hidden = !s || s.kind === 'flagship'; // nothing under ANYWHERE — nothing is scoped
+  if (h.hidden) return;
+  h.textContent = `Carried brands, ${fmtAsOf(s.as_of)} — not live stock`;
 }
 
 function chip(kind, v, label) {
@@ -197,18 +195,19 @@ function chipsHtml() {
   return locationChipHtml() + wantChipsHtml() + avoidChipsHtml();
 }
 
-function renderSort() {
-  el('sort').innerHTML = SORTS
-    .map(([v, label]) => `<button type="button" data-sort="${v}" class="${F.sort === v ? 'on' : ''}">${label}</button>`)
-    .join('<span class="sep">/</span>');
-  el('hide-smelled').setAttribute('aria-pressed', String(F.hideSmelled));
-}
-
+// One sentence, where the underlined words are the controls: the sort word
+// cycles pop → rating → year, and hiding/showing toggles the smelled collapse.
+// The smelled clause only appears once it can do something (or is already on).
 function renderCount() {
   if (total == null) return void (el('count').textContent = '');
   const n = results.filter((r) => smelled[r.id]).length;
+  const sortLabel = SORTS.find(([v]) => v === F.sort)[1];
+  const smelledPart = n || F.hideSmelled
+    ? `, <button type="button" class="lnk" id="hide-smelled" aria-pressed="${String(F.hideSmelled)}">${F.hideSmelled ? 'hiding' : 'showing'}</button> ${n} smelled`
+    : '';
   el('count').innerHTML =
-    `${total} perfume${total === 1 ? '' : 's'}${n ? ` <span class="smelled-n">· ${n} smelled</span>` : ''}`;
+    `${total.toLocaleString('en-US')} perfume${total === 1 ? '' : 's'}, ` +
+    `<button type="button" class="lnk" data-sort-cycle title="Change sort">${sortLabel}</button> first${smelledPart}`;
 }
 
 function renderControls() {
@@ -216,7 +215,7 @@ function renderControls() {
   el('chips-location').innerHTML = locationChipHtml();
   el('chips-want').innerHTML = wantChipsHtml();
   el('chips-avoid').innerHTML = avoidChipsHtml();
-  renderSort();
+  renderCount();
 }
 
 // ---- rendering: cards -------------------------------------------------------
@@ -275,14 +274,17 @@ function filtersChanged() {
   syncUrl();
   renderControls();
   scheduleQuery();
+  refreshScopedVocabs();
 }
 
 function clearSearch(field) {
   const input = el(FIELDS[field].input);
+  const box = el(FIELDS[field].ta);
   clearTimeout(taTimers[field]);
   input.value = '';
-  input.focus(); // keeps the field ready for the next pick
-  renderTypeahead(field); // back to browse mode for the follow-up pick
+  input.blur(); // pick is done — also dismisses the keyboard on touch
+  box.hidden = true;
+  box.innerHTML = '';
 }
 
 function selectStore(id) {
@@ -373,6 +375,44 @@ async function surprise() {
 
 // ---- typeahead --------------------------------------------------------------
 
+// Scoped vocabs: with any filter active, the server recounts every note/brand
+// within the filtered set (store=Le Labo → Bergamot's count is Le Labo's
+// bergamots, zero-count rows dropped). Null = no filters or offline, fall back
+// to the global vocabs. One fetch pair per filter change, not per keystroke.
+let scopedNotesVocab = null; // [[display name, count]] count desc, like notesVocab
+let scopedBrandsVocab = null;
+let scopedNoteCountByNorm = null;
+let scopedBrandCount = null;
+
+let vocabController = null;
+async function refreshScopedVocabs() {
+  vocabController?.abort();
+  const p = filterParams();
+  if (![...p.keys()].length) {
+    scopedNotesVocab = scopedBrandsVocab = scopedNoteCountByNorm = scopedBrandCount = null;
+    return rerenderOpenTypeaheads();
+  }
+  const mine = (vocabController = new AbortController());
+  try {
+    const [n, b] = await Promise.all([
+      fetch(`/api/notes-vocab?${p}`, { signal: mine.signal }).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/brands-vocab?${p}`, { signal: mine.signal }).then((r) => (r.ok ? r.json() : null)),
+    ]);
+    if (mine !== vocabController) return;
+    scopedNotesVocab = n;
+    scopedBrandsVocab = b;
+    scopedNoteCountByNorm = n && new Map(n.map(([name, count]) => [norm(name), count]));
+    scopedBrandCount = b && new Map(b);
+    rerenderOpenTypeaheads();
+  } catch { /* aborted or offline — global counts stand in */ }
+}
+
+function rerenderOpenTypeaheads() {
+  for (const field of Object.keys(FIELDS)) {
+    if (!el(FIELDS[field].ta).hidden) renderTypeahead(field);
+  }
+}
+
 // Each field's box searches client-side — no network per keystroke. Vocabs
 // arrive count-desc from the server, so an empty query just shows the top N
 // (browse mode); a query filters that same order down by substring match.
@@ -382,10 +422,11 @@ function taRow(attr, name, count) {
     </button>`;
 }
 
+// Rows sit under the LA Stores / Flagship Stores headers, so the name alone
+// is enough — no address or kind subtext.
 function storeRow(s) {
-  const sub = `${esc(s.area)} · ${esc(KIND_LABEL.get(s.kind) ?? s.kind)}`;
   return `<button type="button" class="ta-row" data-select-store="${esc(s.id)}">
-      <span class="ta-name">${esc(s.name)} <span class="ta-sub">${sub}</span></span>
+      <span class="ta-name">${esc(s.name)}</span>
       <span class="ta-count">${s.perfumes ?? ''}</span>
     </button>`;
 }
@@ -394,17 +435,19 @@ function renderTypeahead(field) {
   const box = el(FIELDS[field].ta);
   const input = el(FIELDS[field].input);
   const t = norm(input.value);
-  if (t.length === 1) { // too short to filter meaningfully; not empty (browse) either
-    box.hidden = true;
-    box.innerHTML = '';
-    return;
-  }
 
   let html = '';
   if (field === 'location') {
+    // Grouped like the note/brand dropdowns: multi-brand LA shops first, then
+    // single-brand flagships. Area and kind still match a typed query even
+    // though the rows no longer display them.
     const match = (s) => !t || norm(`${s.name} ${s.area} ${KIND_LABEL.get(s.kind) ?? s.kind}`).includes(t);
     const list = stores.filter(match).slice(0, 12);
-    html = list.length ? list.map(storeRow).join('') : '<p class="sub no-results">No matching stores.</p>';
+    const laStores = list.filter((s) => s.kind !== 'flagship');
+    const flagships = list.filter((s) => s.kind === 'flagship');
+    if (laStores.length) html += '<div class="ta-head">LA Stores</div>' + laStores.map(storeRow).join('');
+    if (flagships.length) html += '<div class="ta-head">Flagship Stores</div>' + flagships.map(storeRow).join('');
+    if (!html) html = '<p class="sub no-results">No matching stores.</p>';
   } else {
     // I like / I avoid share one shape: notes then brands. Browse mode (empty
     // box) shows curated defaults — top notes for I like, the classic
@@ -413,16 +456,22 @@ function renderTypeahead(field) {
     // At a flagship the whole store is one brand, so brand filters can only be
     // redundant or empty — the Brands section disappears entirely.
     const flagship = F.store != null && storeById.get(F.store)?.kind === 'flagship';
+    const nVocab = scopedNotesVocab ?? notesVocab;
+    const bVocab = scopedBrandsVocab ?? brandsVocab;
+    const nCount = scopedNoteCountByNorm ?? noteCountByNorm;
+    const bCount = scopedBrandCount ?? brandCount;
     const noteCap = t ? 8 : 3;
     const brandCap = t ? 5 : 3;
     const notes = [];
     if (!t && field === 'avoid') {
+      // Curated defaults recount under the scoped vocab; ones absent from the
+      // scope (count 0) drop out rather than promising an empty result.
       for (const name of DEFAULT_AVOID_NOTES) {
-        const count = noteCountByNorm.get(norm(name));
-        if (count != null) notes.push([name, count]);
+        const count = nCount.get(norm(name));
+        if (count) notes.push([name, count]);
       }
     } else {
-      for (const [name, count] of notesVocab) {
+      for (const [name, count] of nVocab) {
         if (t && !norm(name).includes(t)) continue;
         notes.push([name, count]);
         if (notes.length >= noteCap) break;
@@ -431,11 +480,11 @@ function renderTypeahead(field) {
     const brands = [];
     if (!flagship && !t) {
       for (const name of field === 'want' ? DEFAULT_WANT_BRANDS : DEFAULT_AVOID_BRANDS) {
-        const count = brandCount.get(name);
-        if (count != null) brands.push([name, count]);
+        const count = bCount.get(name);
+        if (count) brands.push([name, count]);
       }
     } else if (!flagship) {
-      for (const [name, count] of brandsVocab) {
+      for (const [name, count] of bVocab) {
         if (!norm(name).includes(t)) continue;
         brands.push([name, count]);
         if (brands.length >= brandCap) break;
@@ -463,9 +512,10 @@ for (const field of Object.keys(FIELDS)) {
     taTimers[field] = setTimeout(() => renderTypeahead(field), 120); // client-side only; game's debounce
   });
   input.addEventListener('focus', () => renderTypeahead(field)); // empty focus = browse the top picks
-  // Pressing a result must not blur the input — the pick handler runs with the
-  // dropdown still open, and focus stays put for the next pick. Mousedown on
-  // the box itself is the scrollbar; that one must keep its default.
+  // Pressing a result must not blur the input mid-click — the focusout would
+  // hide the dropdown before the click lands on the row. The pick handler
+  // closes it itself afterwards (clearSearch). Mousedown on the box itself is
+  // the scrollbar; that one must keep its default.
   ta.addEventListener('mousedown', (e) => {
     if (e.target !== ta) e.preventDefault();
   });
@@ -493,14 +543,14 @@ el('page').addEventListener('click', (e) => {
   if ((hit = e.target.closest('[data-brand]'))) return addBrand('want', hit.dataset.brand);
   if ((hit = e.target.closest('[data-rm]'))) return removeFilter(hit.dataset.rm, hit.dataset.v);
   if ((hit = e.target.closest('[data-smell]'))) return toggleSmelled(Number(hit.dataset.smell));
-  if ((hit = e.target.closest('[data-sort]'))) {
-    if (F.sort !== hit.dataset.sort) { F.sort = hit.dataset.sort; filtersChanged(); }
-    return;
+  if (e.target.closest('[data-sort-cycle]')) {
+    const i = SORTS.findIndex(([v]) => v === F.sort);
+    F.sort = SORTS[(i + 1) % SORTS.length][0];
+    return filtersChanged();
   }
   if (e.target.closest('#hide-smelled')) {
     F.hideSmelled = !F.hideSmelled;
-    renderSort();
-    return renderResults(); // client-side collapse; server total untouched
+    return renderResults(); // client-side collapse; server total untouched — renderCount reflips the word
   }
   if (e.target.closest('#more')) return void runQuery(true);
   if (e.target.closest('#surprise')) return void surprise();
@@ -604,4 +654,5 @@ el('page').addEventListener('error', (e) => {
   syncUrl();
   renderControls();
   runQuery(false);
+  refreshScopedVocabs();
 })();

@@ -7,13 +7,14 @@ Steps:
   4. Dedupe, sort by popularity, assign ids.
   5. Emit search_index.json, notes/<n>.json shards, and notes_vocab.json.
 """
+import csv
 import json
 import os
 import re
 from bisect import bisect_right
 from collections import Counter, defaultdict
 
-from textnorm import ascii_fold, brand_key, norm_key
+from textnorm import ascii_fold, brand_key, norm_key, titlecase_slug
 
 DATA = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(DATA, "out")
@@ -53,6 +54,21 @@ SYNONYM_KEYS = {
     "petitgrain bigarade": "petitgrain",
     "tonka": "tonka bean",
     "coumarin tonka": "tonka bean",
+    # Scent Room retailer-copy typos (2026-08-18) — unambiguous misspellings
+    # of existing notes, not distinct materials
+    "black current": "black currant",
+    "sandal wood": "sandalwood",
+    "ylangylang": "ylang ylang",
+    "worm wood": "wormwood",
+    "peru balasam": "peru balsam",
+    "ambrettre": "ambrette",
+    "artemsia": "artemisia",
+    "jasmine sambas": "jasmine sambac",
+    "casmir wood": "cashmere wood",
+    "nagarmota": "nagarmotha",
+    "bergamo": "bergamot",
+    # Elorea site typo (2026-08-18)
+    "lilly of the valley": "lily of the valley",
 }
 
 # where the most-common spelling isn't the one we want
@@ -99,6 +115,39 @@ def canonicalize_notes(perfumes):
     n_after = len({n for p in perfumes for t in p["notes"].values() for n in t})
     print(f"note vocab: {n_before} -> {n_after}")
 
+
+# Products a brand renamed one-for-one (same juice under a new marketing name,
+# verified by canonical note-set comparison against the retailer's current
+# copy — Bon Parfumeur renamed its whole numbered line ~2023). The OLD row is
+# renamed and keeps its rating/image; the retailer copy of the new name then
+# dedupes away on the next crawl. Parisa's rule 2026-08-18: only pairs whose
+# notes match merge ("602 Pepper Cedar Patchouli" vs "Bois Narcotique 602"
+# is a real reformulation, 5/15 overlap — both cards stay).
+PRODUCT_RENAMES = {
+    ("Bon Parfumeur", "101 Rose Sweet Pea White Cedar"): "101 Parisian Bouquet",
+    ("Bon Parfumeur", "102 Tea Cardamom Mimosa"): "102 Chai Mimosa",
+    ("Bon Parfumeur", "103 Tiare Flower Jasmine Hibiscus"): "103 Bloom Illusion",
+    ("Bon Parfumeur", "104 Orange Verte Jacynthe Lierre"): "Terra Hedera 104",
+    ("Bon Parfumeur", "106 Damascena Rose Davana Vanilla"): "106 Chromatic Rose",
+    ("Bon Parfumeur", "203 Raspberry Vanilla Blackberry"): "203 Mure Ebene",
+    ("Bon Parfumeur", "301 Sandalwood Amber Cardamom"): "301 Noces de Santal",
+    ("Bon Parfumeur", "402 Vanilla Toffee Sandalwood"): "402 Guilty Vanilla",
+    ("Bon Parfumeur", "702 Encens Lavande Bois De Cachemire"): "702 Encens Prive",
+    ("Bon Parfumeur", "801 Sea Spray Cedar Grapefruit"): "801 Blu Palermo",
+    ("Bon Parfumeur", "802 Pivoine Lotus Bambou"): "802 Nymphea Celeste",
+    ("Bon Parfumeur", "901 Nutmeg Almond Patchouli"): "901 Soir Tonka",
+    # same name reordered ("502 Iris Cartagena" vs Luckyscent's "Iris Cartagena
+    # 502"): the rename makes the keys collide so dedupe keeps one rated row
+    ("Bon Parfumeur", "502 Iris Cartagena"): "Iris Cartagena 502",
+}
+
+# Parfumo rows for products that also exist under a trusted source where the
+# parfumo notes are provably wrong (0/24 note overlap on the same-named product
+# — the known unauthenticated-fetch poisoning). Dropped whole after name
+# cleaning; the trusted row remains. Keyed (brand, cleaned name).
+PARFUMO_SUPERSEDED = {
+    ("Bon Parfumeur", "602 Bois Narcotique Intense"),
+}
 
 # ------------------------------------------------------------- display names
 
@@ -147,6 +196,18 @@ def clean_name(name, brand, known_conc, strip_year):
 
 
 def clean_names(perfumes):
+    renames = {(brand_key(b), norm_key(n)): new for (b, n), new in PRODUCT_RENAMES.items()}
+    hand = Counter()
+    for p in perfumes:
+        new = renames.get((brand_key(p["brand"]), norm_key(p["name"])))
+        if new:
+            p["name"] = new
+            hand[new] += 1
+    for (b, n), new in PRODUCT_RENAMES.items():
+        if not hand[new]:
+            print(f"product rename matched nothing: {b} — {n}")
+    print(f"product renames applied: {sum(hand.values())}")
+
     renamed = 0
     for p in perfumes:
         if p["source"] == "fragrantica":
@@ -312,6 +373,65 @@ def build_dedup(perfumes):
     return suppress
 
 
+# ------------------------------------------------------------ image recovery
+
+FRA_CSV_URL = re.compile(r"/perfume/([^/]+)/([^/]+)-(\d+)\.html")
+
+
+def attach_fids(perfumes):
+    """Recover Fragrantica image ids for rows that only carry a page url.
+
+    A fid image is one CDN fetch (fimgs.net) and the smell list warms it on
+    browse; a url image needs a full page scrape and is never warmed there.
+    The raw files already know many of these bottles — no crawling involved:
+      - parfumo_gap_matches.jsonl maps parfumo url -> the fid the gap crawl
+        was matched from (page identity, exact)
+      - fra_perfumes.csv rows skipped at build time for having no notes still
+        carry a fid in their url
+      - fragrantica_index.jsonl (the 2024+ sitemap index) has fid per row
+    Runs after clean_names/unify_brands so (brand, name) keys line up the
+    same way dedupe's do. Name matches also try name+concentration, since
+    Fragrantica names often embed it ("No 5 Eau de Toilette").
+    """
+    raw = os.path.join(DATA, "raw")
+    by_url = {}
+    with open(os.path.join(raw, "parfumo_gap_matches.jsonl"), encoding="utf-8") as f:
+        for line in f:
+            rec = json.loads(line)
+            if rec.get("parfumo_url") and rec.get("fid") is not None:
+                by_url.setdefault(rec["parfumo_url"].lower(), rec["fid"])
+
+    by_key = {}
+    with open(os.path.join(raw, "fra_perfumes.csv"), encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            m = FRA_CSV_URL.search(row.get("url") or "")
+            if m:
+                key = (brand_key(titlecase_slug(m.group(1))), norm_key(titlecase_slug(m.group(2))))
+                by_key.setdefault(key, int(m.group(3)))
+    with open(os.path.join(raw, "fragrantica_index.jsonl"), encoding="utf-8") as f:
+        for line in f:
+            rec = json.loads(line)
+            by_key.setdefault((brand_key(rec["brand"]), norm_key(rec["name"])), rec["fid"])
+
+    n_url = n_key = 0
+    for p in perfumes:
+        if p.get("fid"):
+            continue
+        fid = by_url.get((p.get("url") or "").lower())
+        if fid is not None:
+            p["fid"] = fid
+            n_url += 1
+            continue
+        bk = brand_key(p["brand"])
+        fid = by_key.get((bk, norm_key(p["name"])))
+        if fid is None and p.get("concentration"):
+            fid = by_key.get((bk, norm_key(f"{p['name']} {p['concentration']}")))
+        if fid is not None:
+            p["fid"] = fid
+            n_key += 1
+    print(f"image fids recovered: {n_url} by url, {n_key} by brand+name")
+
+
 # ---------------------------------------------------------------- output
 
 def dedupe_and_rank(perfumes):
@@ -372,6 +492,10 @@ def emit(perfumes):
     for shard_id, content in shards.items():
         with open(os.path.join(OUT, "notes", f"{shard_id}.json"), "w", encoding="utf-8") as f:
             json.dump(content, f, ensure_ascii=False)
+    # a shrinking dataset leaves stale high-numbered shards behind — remove them
+    for fn in os.listdir(os.path.join(OUT, "notes")):
+        if fn.endswith(".json") and int(fn[:-5]) not in shards:
+            os.remove(os.path.join(OUT, "notes", fn))
 
     tier_counts = defaultdict(lambda: {"top": 0, "middle": 0, "base": 0, "flat": 0, "total": 0})
     for p in perfumes:
@@ -434,6 +558,19 @@ def main():
     canonicalize_notes(perfumes)
     clean_names(perfumes)
     unify_brands(perfumes)
+    attach_fids(perfumes)
+
+    superseded = {(brand_key(b), norm_key(n)) for b, n in PARFUMO_SUPERSEDED}
+    kept = [p for p in perfumes
+            if p["source"] != "parfumo"
+            or (brand_key(p["brand"]), norm_key(p["name"])) not in superseded]
+    if len(perfumes) - len(kept) != len(PARFUMO_SUPERSEDED):
+        print(f"parfumo superseded: expected {len(PARFUMO_SUPERSEDED)}, "
+              f"dropped {len(perfumes) - len(kept)} — check the table")
+    else:
+        print(f"parfumo superseded rows dropped: {len(PARFUMO_SUPERSEDED)}")
+    perfumes = kept
+
     perfumes = dedupe_and_rank(perfumes)
 
     with open(src, "w", encoding="utf-8") as f:

@@ -19,6 +19,7 @@ const EMPTY = new Uint32Array(0);
 
 let postings = new Map(); // norm(note) -> Uint32Array of ids, ascending
 let brandToIds = new Map(); // exact dataset brand string -> Uint32Array asc
+let noteDisplayByKey = new Map(); // norm(note) -> display name, for filtered vocab counts
 let suppressed = new Set(); // dedup.json variant rows: hidden from /list, ids valid elsewhere
 let stores = []; // {id, name, kind, area, as_of, brandSet, idArray, idSet}
 let storesById = new Map();
@@ -163,6 +164,11 @@ export async function initSmellList() {
   meta.length = 0; // ditto: the parsed meta rows are typed-array copies now
 
   const vocab = JSON.parse(await readFile(path.join(OUT_DIR, 'notes_vocab.json'), 'utf8'));
+  noteDisplayByKey = new Map();
+  for (const v of vocab) {
+    const key = norm(v.note);
+    if (!noteDisplayByKey.has(key)) noteDisplayByKey.set(key, v.note);
+  }
   // Counts come from the postings (deduplicated perfume counts), not the
   // vocab's tier-double-counting totals — what the typeahead shows must match
   // what filtering returns.
@@ -210,6 +216,7 @@ function indexNewPerfume(id, entry) {
       if (seen.has(key)) continue;
       seen.add(key);
       postings.set(key, appendId(postings.get(key), id));
+      if (!noteDisplayByKey.has(key)) noteDisplayByKey.set(key, note);
     }
   }
   brandToIds.set(entry.brand, appendId(brandToIds.get(entry.brand), id));
@@ -244,53 +251,93 @@ function sendVocab(res, gz) {
   res.end(gz);
 }
 
-export function handleNotesVocab(res) {
-  sendVocab(res, notesVocabGz);
+// Filtered vocab responses vary per filter combination, so they are gzipped
+// per request (a few ms over ~500k postings pairs) and cached briefly by URL,
+// unlike the boot-time global vocabs.
+function sendFilteredVocab(res, rows) {
+  res.writeHead(200, {
+    'content-type': 'application/json; charset=utf-8',
+    'content-encoding': 'gzip',
+    'cache-control': 'public, max-age=300',
+  });
+  res.end(gzipSync(JSON.stringify(rows)));
 }
 
-export function handleBrandsVocab(res) {
-  sendVocab(res, brandsVocabGz);
-}
+const FILTER_PARAMS = ['store', 'brand', 'avoidBrand', 'want', 'avoid'];
+const hasFilters = (q) => FILTER_PARAMS.some((p) => q.has(p));
 
-export async function handleSmellList(url, res) {
+// With filter params, counts are perfumes matching the filters AND carrying
+// the note — "what you'd see if you added this" — zero-count entries dropped
+// so the typeahead only offers rows that lead somewhere. Without params, the
+// boot-time global vocab.
+export function handleNotesVocab(url, res) {
   const q = url.searchParams;
+  if (!hasFilters(q)) return sendVocab(res, notesVocabGz);
+  const m = matchFilters(q);
+  if (m.error) return sendJson(res, m.error[0], { error: m.error[1] });
+  const matchedSet = new Set(m.matched);
+  const rows = [];
+  for (const [key, arr] of postings) {
+    let count = 0;
+    for (const id of arr) if (matchedSet.has(id)) count++;
+    if (!count) continue;
+    const display = noteDisplayByKey.get(key);
+    if (display) rows.push([display, count]);
+  }
+  rows.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
+  sendFilteredVocab(res, rows);
+}
 
+export function handleBrandsVocab(url, res) {
+  const q = url.searchParams;
+  if (!hasFilters(q)) return sendVocab(res, brandsVocabGz);
+  const m = matchFilters(q);
+  if (m.error) return sendJson(res, m.error[0], { error: m.error[1] });
+  const matchedSet = new Set(m.matched);
+  const rows = [];
+  for (const [brand, arr] of brandToIds) {
+    let count = 0;
+    for (const id of arr) if (matchedSet.has(id)) count++;
+    if (count) rows.push([brand, count]);
+  }
+  rows.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
+  sendFilteredVocab(res, rows);
+}
+
+// Parses the shared filter params (store/brand/avoidBrand/want/avoid) and
+// runs the match. Shared by /api/smell-list and the filtered vocab endpoints,
+// so the typeahead counts and the result totals can never disagree.
+// Returns { error: [status, message] } or { matched, storeId } with matched
+// ascending by construction (base arrays are ascending).
+function matchFilters(q) {
   const storeId = q.get('store');
   let store = null;
   if (storeId != null) {
     store = storesById.get(storeId);
-    if (!store) return sendJson(res, 404, { error: `Unknown store: ${storeId}` });
+    if (!store) return { error: [404, `Unknown store: ${storeId}`] };
   }
 
   const brandNames = [...new Set(q.getAll('brand'))];
   if (brandNames.length > MAX_BRANDS) {
-    return sendJson(res, 400, { error: `At most ${MAX_BRANDS} brands.` });
+    return { error: [400, `At most ${MAX_BRANDS} brands.`] };
   }
   const brandArrays = [];
   for (const b of brandNames) {
     const ids = brandToIds.get(b);
-    if (!ids) return sendJson(res, 404, { error: `Unknown brand: ${b}` });
+    if (!ids) return { error: [404, `Unknown brand: ${b}`] };
     brandArrays.push(ids);
   }
 
   const avoidBrandNames = [...new Set(q.getAll('avoidBrand'))];
   if (avoidBrandNames.length > MAX_BRANDS) {
-    return sendJson(res, 400, { error: `At most ${MAX_BRANDS} avoided brands.` });
+    return { error: [400, `At most ${MAX_BRANDS} avoided brands.`] };
   }
 
   const wants = [...new Set(q.getAll('want').map(norm))];
   const avoids = [...new Set(q.getAll('avoid').map(norm))];
   if (wants.length > MAX_NOTES || avoids.length > MAX_NOTES) {
-    return sendJson(res, 400, { error: `At most ${MAX_NOTES} want/avoid notes.` });
+    return { error: [400, `At most ${MAX_NOTES} want/avoid notes.`] };
   }
-
-  const sort = q.get('sort') ?? 'pop';
-  if (!SORTS.has(sort)) return sendJson(res, 400, { error: `Unknown sort: ${sort}` });
-  let offset = Number.parseInt(q.get('offset') ?? '0', 10);
-  if (Number.isNaN(offset) || offset < 0) offset = 0;
-  let limit = q.get('limit') == null ? 24 : Number.parseInt(q.get('limit'), 10);
-  if (Number.isNaN(limit)) limit = 24;
-  limit = Math.min(100, Math.max(1, limit));
 
   // An unknown want note is not an error: its posting list is empty, so the
   // query legitimately matches nothing. Unknown avoids (notes or brands) are
@@ -312,7 +359,7 @@ export async function handleSmellList(url, res) {
   for (const b of avoidBrandNames) for (const id of brandToIds.get(b) ?? EMPTY) avoidSet.add(id);
 
   const index = getSearchIndex();
-  const matched = []; // ascending by construction (base arrays are ascending)
+  const matched = [];
   const passes = (id) => {
     // the no-filter branch below scans raw id space, which boot-time
     // filtering can't reach — suppressed ids must be rejected here
@@ -325,6 +372,24 @@ export async function handleSmellList(url, res) {
   } else {
     for (let id = 0; id < index.length; id++) if (passes(id)) matched.push(id);
   }
+  return { matched, storeId };
+}
+
+export async function handleSmellList(url, res) {
+  const q = url.searchParams;
+
+  const sort = q.get('sort') ?? 'pop';
+  if (!SORTS.has(sort)) return sendJson(res, 400, { error: `Unknown sort: ${sort}` });
+  let offset = Number.parseInt(q.get('offset') ?? '0', 10);
+  if (Number.isNaN(offset) || offset < 0) offset = 0;
+  let limit = q.get('limit') == null ? 24 : Number.parseInt(q.get('limit'), 10);
+  if (Number.isNaN(limit)) limit = 24;
+  limit = Math.min(100, Math.max(1, limit));
+
+  const m = matchFilters(q);
+  if (m.error) return sendJson(res, m.error[0], { error: m.error[1] });
+  const { matched, storeId } = m;
+  const index = getSearchIndex();
 
   // pop is free: id order == popularity rank (verify.py asserts it). Tiebreak
   // everywhere is id ascending so paging is a stable total order.

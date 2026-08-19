@@ -285,25 +285,38 @@ body.has-hostbar main { padding-bottom: 140px; }
 .chip .area { color: var(--faint); }
 .honesty { color: var(--faint); margin: -8px 0 0; }
 
-/* typeahead — the game's .search-box/.results shell with taller tap targets;
-   floats over whatever follows so it never pushes the layout around */
+/* typeahead — measured off the Heliot Emil desktop menu: bare 10px/14px lines
+   with a pure 10px gap between them (no row padding), the count pushed to the
+   right edge, hover underlines. Floats over whatever follows. */
 .ta-results {
   margin-bottom: 0; position: absolute; top: 100%; left: 0; right: 0; z-index: 5;
   background: var(--bg); border: 1px solid var(--faint); border-top: none;
   max-height: 320px; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  padding: 16px 12px 20px;
+  scrollbar-width: thin; scrollbar-color: var(--faint) transparent;
 }
-.ta-head { color: var(--faint); padding: 10px 12px 4px; }
+.ta-results[hidden] { display: none; } /* display:flex would otherwise defeat the hidden attribute */
+.ta-results::-webkit-scrollbar { width: 4px; }
+.ta-results::-webkit-scrollbar-track { background: transparent; }
+.ta-results::-webkit-scrollbar-thumb { background: var(--faint); }
+.ta-head { color: var(--faint); padding: 0; }
+.ta-head:not(:first-child) { margin-top: 14px; }
 .ta-row {
-  display: flex; justify-content: space-between; align-items: center; gap: 12px;
-  width: 100%; min-height: 44px; padding: 0 12px; border: none;
+  display: flex; align-items: baseline; gap: 3px;
+  align-self: stretch; /* full-width, so the count can right-align */
+  padding: 0; border: none;
   background: none; color: var(--ink); font: inherit; text-transform: inherit;
   text-align: left; cursor: pointer;
 }
-.ta-row:hover, .ta-row:focus-visible { background: var(--panel); outline: none; }
+.ta-row:hover, .ta-row:focus-visible { outline: none; }
+.ta-row:hover .ta-name, .ta-row:focus-visible .ta-name {
+  text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px;
+}
 .ta-name { min-width: 0; overflow-wrap: anywhere; }
 .ta-sub { color: var(--faint); }
-.ta-count { color: var(--faint); white-space: nowrap; }
-.ta-results .no-results { padding: 10px 12px; margin: 0; }
+.ta-count { color: var(--faint); white-space: nowrap; margin-left: auto; }
+.ta-results .no-results { padding: 0; margin: 0; }
 
 /* active filters: a plain text list stacked under each field, no boxes or
    fills — the faint × is the removal affordance */
@@ -313,16 +326,14 @@ body.has-hostbar main { padding-bottom: 140px; }
 .filter-chips .chip::after { content: '×'; margin-left: 6px; color: var(--faint); }
 .filter-chips .chip:hover::after { color: var(--ink); }
 
-.count-row {
-  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 16px;
-  padding: 10px 0;
+/* The count line IS the controls: underlined words are buttons. Vertical
+   padding on the inline buttons grows the tap target without moving the line. */
+.countline { margin: 0; padding: 10px 0; }
+.countline .lnk {
+  background: none; border: none; padding: 8px 1px; margin: 0; color: var(--ink); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px;
 }
-.smelled-n { color: var(--faint); }
-.count-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.sort3 { display: inline-flex; align-items: center; gap: 4px; }
-.sort3 .sep { color: var(--faint); }
-.sort3 button { background: none; border: none; padding: 8px 2px; color: var(--faint); cursor: pointer; }
-.sort3 button.on { color: var(--ink); }
+.countline .lnk:hover { text-decoration-color: var(--faint); }
 .tog { background: none; border: none; padding: 8px 6px; color: var(--faint); cursor: pointer; }
 .tog[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 

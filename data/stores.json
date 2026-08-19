@@ -67,9 +67,9 @@
     "id": "scentroom-la",
     "name": "The Scent Room",
     "kind": "boutique",
-    "area": "Los Angeles",
+    "area": "Larchmont Village",
     "as_of": "2026-08",
-    "brands": []
+    "brands_file": "scentroom_vendors.json"
   },
   {
     "id": "dsm-la",
@@ -110,6 +110,14 @@
     "area": "La Cienega",
     "as_of": "2026-08",
     "brands": ["Dries Van Noten"]
+  },
+  {
+    "id": "malin-goetz",
+    "name": "Malin+Goetz",
+    "kind": "flagship",
+    "area": "Larchmont Village",
+    "as_of": "2026-08",
+    "brands": ["Malin+Goetz"]
   },
   {
     "id": "elorea",

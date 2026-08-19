@@ -5,6 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from clean_dataset import BRAND_DISPLAY_OVERRIDES, TIER2_FORMAT_KEYS
+from poison import POISON_KEYS
 from textnorm import norm_key
 
 DATA = os.path.dirname(os.path.abspath(__file__))
@@ -36,6 +37,9 @@ check(sauvage is not None and sauvage["notes"]["top"], "Dior Sauvage present wit
 million = next((p for p in perfumes if p["name"] == "1 Million"), None)
 check(million is not None, '"1 Million" name restored from Parfumo Number column')
 
+check(not any(p["brand"] == "Brand" for p in perfumes),
+      "no TidyTuesday header-echo placeholder rows (brand 'Brand')")
+
 dataset_brands = {p["brand"] for p in perfumes}
 check(all(v in dataset_brands for v in BRAND_DISPLAY_OVERRIDES.values()),
       "brand display overrides applied (D.S. & Durga et al.)")
@@ -43,6 +47,10 @@ check(all(v in dataset_brands for v in BRAND_DISPLAY_OVERRIDES.values()),
 vocab_notes = {n for p in perfumes for t in p["notes"].values() for n in t}
 check(not any(n[:1].islower() for n in vocab_notes), "no lowercase-leading note names")
 check("Frankincense" in vocab_notes and "Incense" in vocab_notes, "Frankincense and Incense kept distinct")
+check(not any(norm_key(n) in POISON_KEYS
+              for p in perfumes if p["source"] == "parfumo"
+              for t in p["notes"].values() for n in t),
+      "no known Parfumo decoy note survives on a parfumo row")
 
 with open(os.path.join(OUT, "search_index.json"), encoding="utf-8") as f:
     index = json.load(f)

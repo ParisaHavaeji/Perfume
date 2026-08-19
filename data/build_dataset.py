@@ -10,6 +10,12 @@ Sources, in priority order (first one to claim a brand+name wins):
      won't serve us, crawled from Parfumo via parfumo_gap.py
   6. Parfumo live adds (raw/parfumo_new.jsonl) — pages the game host pasted
      mid-game, fetched by server/parfumo.js
+  7. Scent Room (raw/scentroom_catalog.jsonl) — The Scent Room LA's Shopify
+     catalog via scentroom_refresh.py; only records not already in the
+     dataset at crawl time (dup: false) merge
+  8. Malin+Goetz (raw/malingoetz_catalog.jsonl) — the brand's own fragrance
+     pages via malingoetz_refresh.py (the malin-goetz flagship assortment;
+     absent from every other source)
 
 Run clean_dataset.py afterwards to normalize and emit the browser-ready files.
 """
@@ -20,6 +26,7 @@ from collections import Counter, defaultdict
 
 import pandas as pd
 
+from poison import is_poisoned
 from textnorm import brand_key, norm_key, split_notes, titlecase_slug
 
 DATA = os.path.dirname(os.path.abspath(__file__))
@@ -94,6 +101,9 @@ def load_parfumo():
             "base": split_notes(row.Base_Notes) if pd.notna(row.Base_Notes) else [],
         }
         if not any(tiers.values()):
+            continue
+        # the CSV contains literal header-echo rows ("Name,Brand,...,Top Notes,...")
+        if str(row.Name) == "Name" and str(row.Brand) == "Brand":
             continue
         structure, notes = tiers_to_entry(tiers)
         name = str(row.Name)
@@ -209,6 +219,9 @@ def load_parfumo_gap():
                     "structure": structure,
                     "notes": notes,
                     "url": rec["url"],  # for og:image lookup
+                    # the fragrantica id the gap-matcher paired this page with —
+                    # its bottle image is a plain CDN fetch, no page scrape
+                    "fid": rec.get("fid"),
                     "concentration": None,
                     "rating": rec.get("rating"),
                     "ratingCount": rec.get("votes"),
@@ -247,6 +260,109 @@ def load_parfumo_new():
     return out
 
 
+def load_scentroom():
+    """The Scent Room LA catalog (scentroom_refresh.py, raw/scentroom_catalog.jsonl).
+    Records marked dup were in the dataset at crawl time; only the rest merge."""
+    path = os.path.join(RAW, "scentroom_catalog.jsonl")
+    if not os.path.exists(path):
+        return []
+    out = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            rec = json.loads(line)
+            if rec["dup"] or not rec["notes"]:
+                continue
+            if "flat" in rec["notes"]:
+                structure, notes = "flat", {"flat": rec["notes"]["flat"]}
+            else:
+                structure, notes = tiers_to_entry(rec["notes"])
+            out.append(
+                {
+                    "name": rec["name"],
+                    "brand": rec["brand"],
+                    "year": None,
+                    "gender": None,
+                    "source": "scentroom",
+                    "structure": structure,
+                    "notes": notes,
+                    "url": f"https://www.thescentroom.com/products/{rec['handle']}",
+                    "concentration": rec["concentration"],
+                    "rating": None,
+                    "ratingCount": None,
+                }
+            )
+    return out
+
+
+def load_malingoetz():
+    """Malin+Goetz's own fragrance pages (malingoetz_refresh.py,
+    raw/malingoetz_catalog.jsonl). Name and concentration are pre-split by
+    the crawler; notes are always tiered."""
+    path = os.path.join(RAW, "malingoetz_catalog.jsonl")
+    if not os.path.exists(path):
+        return []
+    out = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            rec = json.loads(line)
+            if not rec.get("notes"):
+                continue
+            structure, notes = tiers_to_entry(rec["notes"])
+            out.append(
+                {
+                    "name": rec["name"],
+                    "brand": rec["brand"],
+                    "year": None,
+                    "gender": None,
+                    "source": "malingoetz",
+                    "structure": structure,
+                    "notes": notes,
+                    "url": rec["url"],  # for og:image lookup
+                    "concentration": rec["concentration"],
+                    "rating": None,
+                    "ratingCount": None,
+                }
+            )
+    return out
+
+
+def load_elorea():
+    """Elorea's own product pages (elorea_refresh.py, raw/elorea_catalog.jsonl).
+    The concentration goes back INTO the name (clean_name re-splits it): GIT and
+    HAZY BLUE exist as EdP and Extrait with different pyramids, and the
+    build-stage dedupe key is (brand, name) only — a bare name would silently
+    drop one of the pair here instead of letting the dedup-map tiers rule."""
+    path = os.path.join(RAW, "elorea_catalog.jsonl")
+    if not os.path.exists(path):
+        return []
+    out = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            rec = json.loads(line)
+            if not rec.get("notes"):
+                continue
+            structure, notes = tiers_to_entry(rec["notes"])
+            name = rec["name"]
+            if rec.get("concentration"):
+                name = f"{name} {rec['concentration']}"
+            out.append(
+                {
+                    "name": name,
+                    "brand": rec["brand"],
+                    "year": None,
+                    "gender": None,
+                    "source": "elorea",
+                    "structure": structure,
+                    "notes": notes,
+                    "url": rec["url"],  # for og:image lookup
+                    "concentration": rec["concentration"],
+                    "rating": None,
+                    "ratingCount": None,
+                }
+            )
+    return out
+
+
 def dedupe(perfumes):
     """Keep one entry per (brand, name); higher-priority source / more votes wins."""
     by_key = {}
@@ -264,10 +380,19 @@ def dedupe(perfumes):
 
 def main():
     # the refresh goes last so it only adds what the older dumps are missing
-    sources = [load_fragrantica(), load_parfumo(), load_luckyscent(), load_fragrantica_refresh(), load_parfumo_gap(), load_parfumo_new()]
+    sources = [load_fragrantica(), load_parfumo(), load_luckyscent(), load_fragrantica_refresh(), load_parfumo_gap(), load_parfumo_new(), load_scentroom(), load_malingoetz(), load_elorea()]
     for chunk in sources:
         if chunk:
             print(f"{chunk[0]['source']}: {len(chunk)} with notes")
+
+    # Parfumo rows carrying known decoy notes are dropped whole — the real
+    # notes can't be told apart from the remaining fabrications (data/poison.py).
+    n_poisoned = 0
+    for i, chunk in enumerate(sources):
+        kept = [p for p in chunk if not is_poisoned(p)]
+        n_poisoned += len(chunk) - len(kept)
+        sources[i] = kept
+    print(f"poisoned parfumo rows dropped: {n_poisoned}")
 
     # earlier sources win: fragrantica > parfumo > luckyscent
     claimed = set()

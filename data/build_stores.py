@@ -4,7 +4,9 @@ Runs after clean_dataset.py (needs the unified brand spellings). Store brand nam
 are matched via brand_key() so curated spellings ("D.S. & Durga") land on the
 dataset's canonical string ("DS Durga") without hand-aligning stores.json.
 A store may instead declare brands_from_source (its list = every brand appearing
-on a perfume from that source), plus optional brands_extra / brands_exclude.
+on a perfume from that source) or brands_file (a JSON list in data/raw/ written
+by a crawler, e.g. scentroom_refresh.py), plus optional brands_extra /
+brands_exclude.
 Stores with no list yet are skipped, not emitted: they enter the picker only
 once their lists are supplied.
 """
@@ -45,6 +47,9 @@ def main():
         supplied = list(store.get("brands", []))
         if store.get("brands_from_source"):
             supplied += sorted(source_brands[store["brands_from_source"]])
+        if store.get("brands_file"):
+            with open(os.path.join(DATA, "raw", store["brands_file"]), encoding="utf-8") as f:
+                supplied += json.load(f)
         supplied += store.get("brands_extra", [])
         if not supplied:
             print(f"{store['id']}: SKIPPED — no brand list supplied yet")
