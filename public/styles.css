@@ -281,7 +281,16 @@ body.has-hostbar main { padding-bottom: 140px; }
    mobile so all four rows (Sort / Location / I like / I avoid) put their
    values (and chip rows) at the same x. */
 .finder-row { --finder-label-w: 62px; display: flex; flex-direction: column; gap: 24px; }
-.finder-field { display: grid; grid-template-columns: var(--finder-label-w) 1fr; align-items: baseline; gap: 8px 10px; }
+.finder-field { position: relative; display: grid; grid-template-columns: var(--finder-label-w) 1fr; align-items: baseline; gap: 8px 10px; }
+/* Once a field holds chosen filters, a hairline runs down its left edge from
+   the label to the last chip — label and chips read as one group. It hangs in
+   the 15px page gutter (absolute, negative left) so the label's own x never
+   moves: I LIKE has to stay flush with the SMELL LIST title above it. The 4px
+   top lands the line on the label's cap line, not the row box above it. */
+.finder-field.grouped::before {
+  content: ''; position: absolute; left: -10px; top: 4px; bottom: 2px;
+  width: 1px; background: var(--faint);
+}
 .finder-label { display: block; color: var(--ink); }
 .finder-field .search-box { border-bottom: none; padding-bottom: 0; }
 /* chosen filters line up with the label's start, not the search bar's, and
@@ -356,6 +365,32 @@ body.has-hostbar main { padding-bottom: 140px; }
 .filter-chips .chip { margin: 0; padding: 0; text-align: left; }
 .filter-chips .chip::after { content: '×'; margin-left: 6px; color: var(--faint); }
 .filter-chips .chip:hover::after { color: var(--ink); }
+/* AND / OR leads the line it joins, so the first chip has none:
+   MUSK / OR APPLE / OR PATCHOULI. */
+.chip-line { display: flex; align-items: baseline; gap: 6px; }
+.conj {
+  background: none; border: none; padding: 0; margin: 0;
+  color: var(--faint); font: inherit; text-transform: inherit; cursor: pointer;
+}
+span.conj { cursor: default; }
+button.conj:hover { color: var(--ink); text-decoration: underline; }
+.conj:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
+.conj[aria-pressed="true"] { color: var(--ink); }
+
+/* typeahead rows for I like once the list is non-empty: the pick button keeps
+   the whole row, the two joiners sit at the right edge. Clicking the row body
+   uses the mode already in force; the words set it. */
+.ta-row-conj { cursor: default; gap: 8px; }
+.ta-row-conj:hover .ta-name { text-decoration: none; }
+.ta-pick {
+  display: flex; align-items: baseline; gap: 3px; flex: 1 1 auto; min-width: 0;
+  background: none; border: none; padding: 0; color: var(--ink);
+  font: inherit; text-transform: inherit; text-align: left; cursor: pointer;
+}
+.ta-pick:hover, .ta-pick:focus-visible { outline: none; }
+.ta-pick:hover .ta-name, .ta-pick:focus-visible .ta-name {
+  text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px;
+}
 
 /* The sort line: "Sort" plus the underlined match count, either opening a
    dropdown with the three sort options. It sits inside the finder row
@@ -406,7 +441,7 @@ body.has-hostbar main { padding-bottom: 140px; }
 }
 .card-bottle img.ok { opacity: 1; }
 .card-bottle:has(img.ok) .ph { visibility: hidden; } /* keep the placeholder's border from ghosting through dimmed images */
-.card-name { margin: 0; text-wrap: balance; }
+.card-name { margin: 0; text-wrap: balance; overflow-wrap: anywhere; }
 .card-meta { margin: -4px 0 6px; color: var(--faint); }
 /* one line per tier (top / middle / base); a long tier still wraps within its row.
    Grid rows stretch every card to the row's tallest (longest notes list), so the
@@ -441,9 +476,14 @@ body.has-hostbar main { padding-bottom: 140px; }
 .empty p { margin: 0; }
 .more-row { display: flex; justify-content: center; align-items: center; gap: 28px; padding: 28px 0 10px; }
 
+/* minmax(0, ...), not a bare 1fr: a bare 1fr floors each track at its widest
+   card's intrinsic width, so one long perfume name (or a wide notes run) drags
+   its whole column past the 1080px page and the grid scrolls off to the right —
+   worst at a store, where the niche names are longest. The 0 floor lets tracks
+   stay equal and inside the container; the card wraps to fit instead. */
 @media (min-width: 700px) {
-  .cards { display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 40px; row-gap: 64px; }
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; row-gap: 64px; }
 }
 @media (min-width: 1000px) {
-  .cards { grid-template-columns: repeat(3, 1fr); }
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

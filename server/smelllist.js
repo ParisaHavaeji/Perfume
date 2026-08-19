@@ -13,6 +13,9 @@ const OUT_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'd
 const SHARD_SIZE = 1000; // mirrors data.js / clean_dataset.py
 
 const SORTS = new Set(['pop', 'rating', 'year']);
+// How the I-like filters combine: every want note/brand (and), or any one
+// of them (or). Never mixed — one mode for the whole I-like list.
+const WANT_MODES = new Set(['and', 'or']);
 const MAX_BRANDS = 6;
 const MAX_NOTES = 12;
 const EMPTY = new Uint32Array(0);
@@ -35,6 +38,9 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+// Concatenate ascending id arrays into one ascending array, dropping repeats.
+// Brand arrays are disjoint so the dedupe is a no-op there, but OR-mode want
+// lists overlap freely (a perfume with both musk and apple is in both).
 function unionSorted(arrays) {
   let total = 0;
   for (const a of arrays) total += a.length;
@@ -44,7 +50,13 @@ function unionSorted(arrays) {
     out.set(a, at);
     at += a.length;
   }
-  return out.sort();
+  out.sort();
+  let n = 0;
+  for (let i = 0; i < out.length; i++) {
+    if (i && out[i] === out[i - 1]) continue;
+    out[n++] = out[i];
+  }
+  return n === out.length ? out : out.subarray(0, n);
 }
 
 export async function initSmellList() {
@@ -310,6 +322,9 @@ export function handleBrandsVocab(url, res) {
 // Returns { error: [status, message] } or { matched, storeId } with matched
 // ascending by construction (base arrays are ascending).
 function matchFilters(q) {
+  const wantMode = q.get('wantMode') ?? 'and';
+  if (!WANT_MODES.has(wantMode)) return { error: [400, `Unknown wantMode: ${wantMode}`] };
+
   const storeId = q.get('store');
   let store = null;
   if (storeId != null) {
@@ -347,13 +362,20 @@ function matchFilters(q) {
 
   // Base = smallest candidate id list; remaining predicates via Set membership.
   let base = null;
-  for (const candidate of [...wantArrays, store?.idArray, brandUnion]) {
-    if (candidate && (!base || candidate.length < base.length)) base = candidate;
-  }
   const mustSets = [];
-  for (const arr of wantArrays) if (arr !== base) mustSets.push(new Set(arr));
-  if (store && store.idArray !== base) mustSets.push(store.idSet);
-  if (brandUnion && brandUnion !== base) mustSets.push(new Set(brandUnion));
+  if (wantMode === 'or' && (wantArrays.length || brandArrays.length)) {
+    // OR: one union over every liked note AND liked brand — they stop being
+    // separate predicates. The store (a different field) still intersects.
+    base = unionSorted([...wantArrays, ...brandArrays]);
+    if (store) mustSets.push(store.idSet);
+  } else {
+    for (const candidate of [...wantArrays, store?.idArray, brandUnion]) {
+      if (candidate && (!base || candidate.length < base.length)) base = candidate;
+    }
+    for (const arr of wantArrays) if (arr !== base) mustSets.push(new Set(arr));
+    if (store && store.idArray !== base) mustSets.push(store.idSet);
+    if (brandUnion && brandUnion !== base) mustSets.push(new Set(brandUnion));
+  }
   const avoidSet = new Set();
   for (const a of avoids) for (const id of postings.get(a) ?? EMPTY) avoidSet.add(id);
   for (const b of avoidBrandNames) for (const id of brandToIds.get(b) ?? EMPTY) avoidSet.add(id);

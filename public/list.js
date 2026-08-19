@@ -57,7 +57,9 @@ let smelled = cacheGet(SMELLED_KEY) ?? {};
 
 // ---- filter + result state --------------------------------------------------
 
-const F = { store: null, brands: [], avoidBrands: [], wants: [], avoids: [], sort: 'pop', hideSmelled: false };
+// wantMode: how the I like list combines — 'and' (every one) or 'or' (any
+// one). Never mixed, so it is one flag for the whole field, not per chip.
+const F = { store: null, brands: [], avoidBrands: [], wants: [], avoids: [], wantMode: 'and', sort: 'pop', hideSmelled: false };
 let stores = [];
 let notesVocab = []; // [[display name, perfume count]] count desc, from the server
 let brandsVocab = [];
@@ -95,6 +97,9 @@ function filterParams() {
   for (const b of F.avoidBrands) p.append('avoidBrand', b);
   for (const w of F.wants) p.append('want', w);
   for (const a of F.avoids) p.append('avoid', a);
+  // With one liked thing and/or mean the same query, so the mode only rides
+  // along once it changes the result — keeps shared URLs clean.
+  if (F.wantMode === 'or' && F.wants.length + F.brands.length > 1) p.append('wantMode', 'or');
   return p;
 }
 
@@ -173,18 +178,36 @@ function locationChipHtml() {
   return chip('store', s.id, `${esc(s.name)} <span class="area">${esc(s.area)}</span>`);
 }
 
+// One chosen filter per line, joined by the word that says how they combine —
+// MUSK / OR APPLE / OR PATCHOULI. The joiner leads the line it applies to, so
+// the first has none. On I like it is a button (flips the whole list between
+// AND and OR); on I avoid it is plain text, since avoiding two things always
+// means avoiding both.
+function chipLines(rows, joiner, clickable) {
+  return rows
+    .map(([kind, v], i) => {
+      const j = i === 0 ? '' : clickable
+        ? `<button type="button" class="conj" data-want-mode title="Switch to ${joiner === 'AND' ? 'OR' : 'AND'}">${joiner}</button>`
+        : `<span class="conj">${joiner}</span>`;
+      return `<div class="chip-line">${j}${chip(kind, v)}</div>`;
+    })
+    .join('');
+}
+
 function wantChipsHtml() {
-  return [
-    ...F.wants.map((w) => chip('want', w)),
-    ...F.brands.map((b) => chip('brand', b)),
-  ].join('');
+  const rows = [
+    ...F.wants.map((w) => ['want', w]),
+    ...F.brands.map((b) => ['brand', b]),
+  ];
+  return chipLines(rows, F.wantMode === 'or' ? 'OR' : 'AND', true);
 }
 
 function avoidChipsHtml() {
-  return [
-    ...F.avoids.map((a) => chip('avoid', a)),
-    ...F.avoidBrands.map((b) => chip('avoidBrand', b)),
-  ].join('');
+  const rows = [
+    ...F.avoids.map((a) => ['avoid', a]),
+    ...F.avoidBrands.map((b) => ['avoidBrand', b]),
+  ];
+  return chipLines(rows, 'AND', false);
 }
 
 function chipsHtml() {
@@ -231,6 +254,12 @@ function renderControls() {
   el('chips-location').innerHTML = locationChipHtml();
   el('chips-want').innerHTML = wantChipsHtml();
   el('chips-avoid').innerHTML = avoidChipsHtml();
+  // The bracket line down the left of I like / I avoid only exists while the
+  // field holds something to bracket.
+  for (const field of ['want', 'avoid']) {
+    const wrap = el(FIELDS[field].input).closest('.finder-field');
+    wrap.classList.toggle('grouped', el(`chips-${field}`).childElementCount > 0);
+  }
   renderCount();
 }
 
@@ -309,7 +338,10 @@ function selectStore(id) {
   filtersChanged();
 }
 
-function addNote(kind, name) {
+// mode is only meaningful for want ('and' | 'or'); picking a row body passes
+// the mode already in force, the AND / OR words pass the one they name.
+function addNote(kind, name, mode) {
+  if (kind === 'want' && mode) F.wantMode = mode;
   const key = norm(name);
   const mine = kind === 'want' ? F.wants : F.avoids;
   const other = kind === 'want' ? F.avoids : F.wants;
@@ -323,7 +355,8 @@ function addNote(kind, name) {
   filtersChanged();
 }
 
-function addBrand(kind, name) {
+function addBrand(kind, name, mode) {
+  if (kind === 'want' && mode) F.wantMode = mode;
   const mine = kind === 'want' ? F.brands : F.avoidBrands;
   const other = kind === 'want' ? F.avoidBrands : F.brands;
   const oi = other.indexOf(name); // like vs avoid is exclusive, same as notes
@@ -344,6 +377,7 @@ function removeFilter(kind, value) {
   const list = { want: F.wants, avoid: F.avoids, brand: F.brands, avoidBrand: F.avoidBrands }[kind];
   const i = list.indexOf(value);
   if (i >= 0) list.splice(i, 1);
+  if (!F.wants.length && !F.brands.length) F.wantMode = 'and'; // emptied — back to the default
   filtersChanged();
 }
 
@@ -438,6 +472,21 @@ function taRow(attr, name, count) {
     </button>`;
 }
 
+// I like rows, once the field already holds something: the same row, plus the
+// two joiners on the right. Clicking the row itself keeps whichever mode is in
+// force (AND until told otherwise); the words pick one explicitly and re-join
+// the whole list, since AND and OR are never mixed.
+function taRowConj(attr, name, count) {
+  const word = (mode) =>
+    `<button type="button" class="conj" ${attr}-${mode}="${esc(name)}" aria-pressed="${String(F.wantMode === mode)}"
+       title="Match ${mode === 'and' ? 'every' : 'any'} liked note or brand">${mode}</button>`;
+  return `<div class="ta-row ta-row-conj">
+      <button type="button" class="ta-pick" ${attr}="${esc(name)}">
+        <span class="ta-name">${esc(name)}</span><span class="ta-count">${count}</span>
+      </button>${word('and')}${word('or')}
+    </div>`;
+}
+
 // Rows sit under the LA Stores / Flagship Stores headers, so the name alone
 // is enough — no address or kind subtext.
 function storeRow(s) {
@@ -519,8 +568,12 @@ function renderTypeahead(field) {
     }
     const noteAttr = field === 'want' ? 'data-want' : 'data-avoid';
     const brandAttr = field === 'want' ? 'data-brand' : 'data-avoid-brand';
-    if (notes.length) html += '<div class="ta-head">Notes</div>' + notes.map(([n, c]) => taRow(`${noteAttr}="${esc(n)}"`, n, c)).join('');
-    if (brands.length) html += '<div class="ta-head">Brands</div>' + brands.map(([b, c]) => taRow(`${brandAttr}="${esc(b)}"`, b, c)).join('');
+    // The and/or choice only exists from the second pick on — with an empty I
+    // like list there is nothing to join it to.
+    const conj = field === 'want' && F.wants.length + F.brands.length > 0;
+    const row = (attr, name, count) => (conj ? taRowConj(attr, name, count) : taRow(`${attr}="${esc(name)}"`, name, count));
+    if (notes.length) html += '<div class="ta-head">Notes</div>' + notes.map(([n, c]) => row(noteAttr, n, c)).join('');
+    if (brands.length) html += '<div class="ta-head">Brands</div>' + brands.map(([b, c]) => row(brandAttr, b, c)).join('');
     if (!html) html = '<p class="sub no-results">No matching notes or brands.</p>';
   }
   box.hidden = false;
@@ -569,10 +622,20 @@ el('count').addEventListener('keydown', (e) => {
 el('page').addEventListener('click', (e) => {
   let hit;
   if ((hit = e.target.closest('[data-select-store]'))) return selectStore(hit.dataset.selectStore);
-  if ((hit = e.target.closest('[data-want]'))) return addNote('want', hit.dataset.want);
+  // The -and / -or variants come first: they are distinct attributes, but a
+  // stray reorder here would have the row body swallow the joiner clicks.
+  if ((hit = e.target.closest('[data-want-and]'))) return addNote('want', hit.dataset.wantAnd, 'and');
+  if ((hit = e.target.closest('[data-want-or]'))) return addNote('want', hit.dataset.wantOr, 'or');
+  if ((hit = e.target.closest('[data-brand-and]'))) return addBrand('want', hit.dataset.brandAnd, 'and');
+  if ((hit = e.target.closest('[data-brand-or]'))) return addBrand('want', hit.dataset.brandOr, 'or');
+  if ((hit = e.target.closest('[data-want]'))) return addNote('want', hit.dataset.want, F.wantMode);
   if ((hit = e.target.closest('[data-avoid-brand]'))) return addBrand('avoid', hit.dataset.avoidBrand);
   if ((hit = e.target.closest('[data-avoid]'))) return addNote('avoid', hit.dataset.avoid);
-  if ((hit = e.target.closest('[data-brand]'))) return addBrand('want', hit.dataset.brand);
+  if ((hit = e.target.closest('[data-brand]'))) return addBrand('want', hit.dataset.brand, F.wantMode);
+  if (e.target.closest('[data-want-mode]')) {
+    F.wantMode = F.wantMode === 'or' ? 'and' : 'or'; // the joiner in the chip list is the undo
+    return filtersChanged();
+  }
   if ((hit = e.target.closest('[data-rm]'))) return removeFilter(hit.dataset.rm, hit.dataset.v);
   if ((hit = e.target.closest('[data-smell]'))) return toggleSmelled(Number(hit.dataset.smell));
   if ((hit = e.target.closest('[data-sort]'))) {
@@ -623,6 +686,7 @@ el('page').addEventListener('error', (e) => {
     avoidBrands: params.getAll('avoidBrand'),
     wants: params.getAll('want'),
     avoids: params.getAll('avoid'),
+    wantMode: params.get('wantMode'),
     sort: params.get('sort'),
   };
 
@@ -676,6 +740,10 @@ el('page').addEventListener('error', (e) => {
     const display = noteByNorm.get(norm(a));
     if (!display) { dropped.push(a); continue; }
     if (F.avoids.length < MAX_NOTES && !F.avoids.includes(display) && !F.wants.includes(display)) F.avoids.push(display);
+  }
+  if (raw.wantMode != null) {
+    if (raw.wantMode === 'and' || raw.wantMode === 'or') F.wantMode = raw.wantMode;
+    else dropped.push(raw.wantMode);
   }
   if (raw.sort != null) {
     if (SORTS.some(([v]) => v === raw.sort)) F.sort = raw.sort;
