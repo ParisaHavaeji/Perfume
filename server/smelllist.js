@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { norm, getSearchIndex, onPerfumeAdded, getPerfume } from './data.js';
-import { imageUrl, cacheImage } from './images.js';
+import { imageUrl, cacheImage, hasSeedImage } from './images.js';
 
 const OUT_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'out');
 const SHARD_SIZE = 1000; // mirrors data.js / clean_dataset.py
@@ -433,10 +433,11 @@ export async function handleSmellList(url, res) {
     const entry = entries[k];
     if (!entry) continue;
     let img = imageUrl(id);
-    if (!img && entry.fid != null) {
+    if (!img && (entry.fid != null || hasSeedImage(entry))) {
       // fid-sourced: one cheap CDN JPEG, warm it and hand out the URL it will
-      // resolve to. url-source entries are NEVER warmed from here (each is a
-      // full page scrape; browse pages must not trigger scraping storms).
+      // resolve to. Seeded url entries are just a local file copy. Bare
+      // url-source entries are NEVER warmed from here (each is a full page
+      // scrape; browse pages must not trigger scraping storms).
       img = `/img/${id}`;
       cacheImage(id, entry);
     }

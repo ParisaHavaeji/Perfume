@@ -322,8 +322,6 @@ body.has-hostbar main { padding-bottom: 140px; }
   .finder-row .countline { grid-template-columns: auto auto; }
 }
 
-.chip .area { color: var(--faint); }
-
 /* typeahead — measured off the Heliot Emil desktop menu: bare 10px/14px lines
    with a pure 10px gap between them (no row padding), the count pushed to the
    right edge, hover underlines. Floats over whatever follows. */
@@ -333,12 +331,17 @@ body.has-hostbar main { padding-bottom: 140px; }
   max-height: 320px; overflow-y: auto;
   display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
   padding: 16px 12px 20px;
-  scrollbar-width: thin; scrollbar-color: var(--faint) transparent;
 }
 .ta-results[hidden] { display: none; } /* display:flex would otherwise defeat the hidden attribute */
+/* Square scrollbar thumb, hard corners. Where ::-webkit-scrollbar works the
+   standard properties must stay off — in Chrome they'd win and force its
+   rounded thumb — so they only apply as the Firefox fallback. */
+@supports not selector(::-webkit-scrollbar) {
+  .ta-results { scrollbar-width: thin; scrollbar-color: var(--faint) transparent; }
+}
 .ta-results::-webkit-scrollbar { width: 4px; }
 .ta-results::-webkit-scrollbar-track { background: transparent; }
-.ta-results::-webkit-scrollbar-thumb { background: var(--faint); }
+.ta-results::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 0; }
 .ta-head { color: var(--faint); padding: 0; }
 .ta-head:not(:first-child) { margin-top: 14px; }
 .ta-row {

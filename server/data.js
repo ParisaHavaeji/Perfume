@@ -57,7 +57,8 @@ export function onPerfumeAdded(fn) {
 
 // Slug casing drifts between Parfumo page editions and the TidyTuesday dump,
 // which also has old hyphenated slugs — compare case-blind with _ and - merged.
-const urlKey = (url) => url.replace(/^https?:\/\//i, '').replace(/\/$/, '').replace(/_/g, '-').toLowerCase();
+// Exported: images.js keys the committed image seed off the same identity.
+export const urlKey = (url) => url.replace(/^https?:\/\//i, '').replace(/\/$/, '').replace(/_/g, '-').toLowerCase();
 
 let urlToId = null; // built from every shard on the first URL-add, then kept fresh
 

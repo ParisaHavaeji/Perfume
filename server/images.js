@@ -6,11 +6,18 @@
 //   og:image, falling back to JSON-LD product metadata (Luckyscent's Shopify
 //   pages have no og:image).
 import { createReadStream } from 'node:fs';
-import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { urlKey } from './data.js';
 
 const CACHE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'cache', 'images');
+// Committed copies of warmed url-source images (Render's disk is ephemeral and
+// cache/ is gitignored, so warmed images would otherwise never reach the live
+// service). Keyed by urlSeedKey, NOT id — pipeline reruns renumber ids, and an
+// id-keyed seed would serve the wrong perfume's photo. See seed_images.js.
+const SEED_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'image_seed');
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
@@ -22,6 +29,13 @@ const TYPE_BY_EXT = Object.fromEntries(Object.entries(EXT_BY_TYPE).map(([type, e
 const status = new Map();
 /** id -> promise that settles when an in-flight download finishes. */
 const inflight = new Map();
+/** urlSeedKey -> ext, for every image in the committed seed. */
+const seedExt = new Map();
+
+/** Seed filename stem for a source URL; url-keyed so id renumbering can't stale it. */
+export function urlSeedKey(url) {
+  return createHash('sha1').update(urlKey(url)).digest('hex').slice(0, 16);
+}
 
 export async function initImageCache() {
   await mkdir(CACHE_DIR, { recursive: true });
@@ -29,6 +43,19 @@ export async function initImageCache() {
     const ext = path.extname(file);
     if (TYPE_BY_EXT[ext]) status.set(Number(path.basename(file, ext)), { state: 'ready', ext });
   }
+  try {
+    for (const file of await readdir(SEED_DIR)) {
+      const ext = path.extname(file);
+      if (TYPE_BY_EXT[ext]) seedExt.set(path.basename(file, ext), ext);
+    }
+  } catch {
+    // no seed directory checked in — every url-source image stays cache-on-queue
+  }
+}
+
+/** True when the committed seed holds this entry's image (a local copy, no scrape). */
+export function hasSeedImage(entry) {
+  return entry?.url != null && seedExt.has(urlSeedKey(entry.url));
 }
 
 export function imageUrl(id) {
@@ -91,6 +118,18 @@ function findPageImage(html) {
 }
 
 async function download(id, entry) {
+  if (entry.url) {
+    const key = urlSeedKey(entry.url);
+    const ext = seedExt.get(key);
+    if (ext) {
+      try {
+        await copyFile(path.join(SEED_DIR, `${key}${ext}`), path.join(CACHE_DIR, `${id}${ext}`));
+        return ext;
+      } catch {
+        // seed file unreadable — fall through to the network path
+      }
+    }
+  }
   const candidates = [];
   if (entry.fid != null) {
     candidates.push(`https://fimgs.net/mdimg/perfume/375x500.${entry.fid}.jpg`);

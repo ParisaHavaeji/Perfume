@@ -175,7 +175,7 @@ function chip(kind, v, label) {
 function locationChipHtml() {
   const s = F.store && storeById.get(F.store);
   if (!s) return '';
-  return chip('store', s.id, `${esc(s.name)} <span class="area">${esc(s.area)}</span>`);
+  return chip('store', s.id, esc(s.name)); // name only — the area would just echo the pick
 }
 
 // One chosen filter per line, joined by the word that says how they combine —
@@ -254,9 +254,9 @@ function renderControls() {
   el('chips-location').innerHTML = locationChipHtml();
   el('chips-want').innerHTML = wantChipsHtml();
   el('chips-avoid').innerHTML = avoidChipsHtml();
-  // The bracket line down the left of I like / I avoid only exists while the
-  // field holds something to bracket.
-  for (const field of ['want', 'avoid']) {
+  // The bracket line down the left of a field only exists while the field
+  // holds something to bracket.
+  for (const field of ['location', 'want', 'avoid']) {
     const wrap = el(FIELDS[field].input).closest('.finder-field');
     wrap.classList.toggle('grouped', el(`chips-${field}`).childElementCount > 0);
   }
@@ -570,9 +570,10 @@ function renderTypeahead(field) {
     }
     const noteAttr = field === 'want' ? 'data-want' : 'data-avoid';
     const brandAttr = field === 'want' ? 'data-brand' : 'data-avoid-brand';
-    // The and/or choice only exists from the second pick on — with an empty I
-    // like list there is nothing to join it to.
-    const conj = field === 'want' && F.wants.length + F.brands.length > 0;
+    // The and/or choice is asked exactly once — on the second pick, where the
+    // join first means anything. From then on plain rows keep whichever mode
+    // was chosen; the joiner in the chip list is where the mind gets changed.
+    const conj = field === 'want' && F.wants.length + F.brands.length === 1;
     const row = (attr, name, count) => (conj ? taRowConj(attr, name, count) : taRow(`${attr}="${esc(name)}"`, name, count));
     if (notes.length) html += '<div class="ta-head">Notes</div>' + notes.map(([n, c]) => row(noteAttr, n, c)).join('');
     if (brands.length) html += '<div class="ta-head">Brands</div>' + brands.map(([b, c]) => row(brandAttr, b, c)).join('');
