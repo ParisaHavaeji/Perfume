@@ -72,6 +72,33 @@
     "brands_file": "scentroom_vendors.json"
   },
   {
+    "id": "bh-perfumery",
+    "name": "Beverly Hills Perfumery",
+    "kind": "boutique",
+    "area": "N Beverly Dr, Beverly Hills",
+    "as_of": "2026-08",
+    "brands": [
+      "A Lab On Fire", "Ajmal", "Alchimista", "Amouage", "Atelier Cologne",
+      "Atelier des Ors", "BDK Parfums", "Boadicea the Victorious", "Boka",
+      "Carner Barcelona", "Caron", "Casamorati 1888", "Cirque du Soleil",
+      "City Rhythm", "Clive Christian", "By Shaik", "Eight & Bob",
+      "Electimuss", "Escentric Molecules", "Etat Libre d'Orange",
+      "Fragrance du Bois", "Franck Boclet", "Frapin", "Fugazzi",
+      "Goldfield & Banks", "Goutal", "Hermetica", "Histoires de Parfums",
+      "Houbigant", "House of Matriarch", "Initio Parfums Prives",
+      "Jean Patou", "Jeroboam", "Juliette Has a Gun", "Jusbox",
+      "Kemi / Al Kimiya", "Kristiansand New York",
+      "La Cristallerie Des Parfums", "LEN Fragrance", "Liquides Imaginaires",
+      "Maison Solis", "M. Micallef", "Mancera", "Marc-Antoine Barrois",
+      "Memo Paris", "Mind Games", "Montale", "Modern Mark", "Nasomatto",
+      "Navitus Parfums", "New Notes", "Nishane", "Ormonde Jayne",
+      "Orto Parisi", "Parfums de Marly", "Parfums de Nicolai",
+      "Perris Monte Carlo", "Rania J", "Roja Parfums", "Royal Crown",
+      "SBOY by Draco", "Sospiro", "Thameen", "Tiziana Terenzi",
+      "Unique'e Luxury", "Veronique Gabai", "Vivamor Parfums", "Xerjoff"
+    ]
+  },
+  {
     "id": "dsm-la",
     "name": "Dover Street Market",
     "kind": "boutique",
@@ -134,6 +161,14 @@
     "area": "Melrose Ave, West Hollywood",
     "as_of": "2026-08",
     "brands": ["Byredo"]
+  },
+  {
+    "id": "frederic-malle",
+    "name": "Frédéric Malle",
+    "kind": "flagship",
+    "area": "Melrose Pl",
+    "as_of": "2026-08",
+    "brands": ["Frédéric Malle"]
   },
   {
     "id": "elorea",

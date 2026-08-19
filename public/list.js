@@ -191,19 +191,40 @@ function chipsHtml() {
   return locationChipHtml() + wantChipsHtml() + avoidChipsHtml();
 }
 
-// One sentence, where the underlined words are the controls: the sort word
-// cycles pop → rating → year, and hiding/showing toggles the smelled collapse.
-// The smelled clause only appears once it can do something (or is already on).
+// A fourth pseudo-field matching Location / I like / I avoid: the "Sort"
+// label, then the underlined match count — either opens a dropdown holding
+// the three sort options (current one inverted) plus the hide-smelled
+// toggle, off by default since smelled perfumes show by default. The
+// countline's smelled clause only appears once it can do something (or is
+// already on).
 function renderCount() {
   if (total == null) return void (el('count').textContent = '');
   const n = results.filter((r) => smelled[r.id]).length;
-  const sortLabel = SORTS.find(([v]) => v === F.sort)[1];
   const smelledPart = n || F.hideSmelled
-    ? `, <button type="button" class="lnk" id="hide-smelled" aria-pressed="${String(F.hideSmelled)}">${F.hideSmelled ? 'hiding' : 'showing'}</button> ${n} smelled`
+    ? `, <button type="button" class="lnk" data-hide-smelled aria-pressed="${String(F.hideSmelled)}">${F.hideSmelled ? 'hiding' : 'showing'}</button> ${n} smelled`
     : '';
   el('count').innerHTML =
-    `${total.toLocaleString('en-US')} perfume${total === 1 ? '' : 's'}, ` +
-    `<button type="button" class="lnk" data-sort-cycle title="Change sort">${sortLabel}</button> first${smelledPart}`;
+    `<button type="button" class="finder-label sort-open" data-sort-open aria-expanded="false" title="Change sort">Sort</button>` +
+    `<span class="sort-val">` +
+    `<button type="button" class="lnk" data-sort-open aria-expanded="false" title="Change sort">${total}</button>${smelledPart}</span>` +
+    `<div class="results ta-results sort-menu" hidden>` +
+    SORTS.map(([v, label]) =>
+      `<button type="button" class="ta-row" data-sort="${v}" aria-pressed="${String(v === F.sort)}"><span class="ta-name">${label}</span></button>`).join('') +
+    `<button type="button" class="ta-row" data-hide-smelled aria-pressed="${String(F.hideSmelled)}"><span class="ta-name">hide smelled</span></button>` +
+    `</div>`;
+}
+
+// Re-rendering always closes the menu (it's built hidden), so open state
+// never needs syncing beyond these two.
+function setSortMenu(open) {
+  const menu = el('count').querySelector('.sort-menu');
+  if (!menu) return;
+  menu.hidden = !open;
+  for (const b of el('count').querySelectorAll('[data-sort-open]')) b.setAttribute('aria-expanded', String(open));
+}
+function toggleSortMenu() {
+  const menu = el('count').querySelector('.sort-menu');
+  if (menu) setSortMenu(menu.hidden);
 }
 
 function renderControls() {
@@ -534,10 +555,15 @@ for (const field of Object.keys(FIELDS)) {
   });
 }
 // Touch never blurs the input reliably — a tap anywhere outside a field closes
-// whichever dropdown is open.
+// whichever dropdown is open. Same deal for the sort menu, which has no input
+// to blur at all.
 document.addEventListener('pointerdown', (e) => {
+  if (!e.target.closest('.countline')) setSortMenu(false);
   if (e.target.closest('.finder-field')) return;
   for (const f of Object.values(FIELDS)) el(f.ta).hidden = true;
+});
+el('count').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') setSortMenu(false);
 });
 
 el('page').addEventListener('click', (e) => {
@@ -549,12 +575,12 @@ el('page').addEventListener('click', (e) => {
   if ((hit = e.target.closest('[data-brand]'))) return addBrand('want', hit.dataset.brand);
   if ((hit = e.target.closest('[data-rm]'))) return removeFilter(hit.dataset.rm, hit.dataset.v);
   if ((hit = e.target.closest('[data-smell]'))) return toggleSmelled(Number(hit.dataset.smell));
-  if (e.target.closest('[data-sort-cycle]')) {
-    const i = SORTS.findIndex(([v]) => v === F.sort);
-    F.sort = SORTS[(i + 1) % SORTS.length][0];
-    return filtersChanged();
+  if ((hit = e.target.closest('[data-sort]'))) {
+    F.sort = hit.dataset.sort;
+    return filtersChanged(); // re-render rebuilds the countline, closing the menu
   }
-  if (e.target.closest('#hide-smelled')) {
+  if (e.target.closest('[data-sort-open]')) return toggleSortMenu();
+  if (e.target.closest('[data-hide-smelled]')) {
     F.hideSmelled = !F.hideSmelled;
     return renderResults(); // client-side collapse; server total untouched — renderCount reflips the word
   }

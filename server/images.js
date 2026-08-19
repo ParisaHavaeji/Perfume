@@ -150,9 +150,19 @@ export function serveImage(id, res) {
     res.writeHead(404).end();
     return;
   }
-  res.writeHead(200, {
-    'content-type': TYPE_BY_EXT[entry.ext],
-    'cache-control': 'public, max-age=86400',
+  const stream = createReadStream(path.join(CACHE_DIR, `${id}${entry.ext}`));
+  stream.on('open', () => {
+    res.writeHead(200, {
+      'content-type': TYPE_BY_EXT[entry.ext],
+      'cache-control': 'public, max-age=86400',
+    });
+    stream.pipe(res);
   });
-  createReadStream(path.join(CACHE_DIR, `${id}${entry.ext}`)).pipe(res);
+  stream.on('error', () => {
+    // The cache file can vanish while the server runs (cache flushes are part
+    // of pipeline reruns); an unhandled stream error would kill the process.
+    status.delete(id);
+    if (!res.headersSent) res.writeHead(404);
+    res.end();
+  });
 }

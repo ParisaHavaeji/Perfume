@@ -230,6 +230,15 @@ def clean_names(perfumes):
 # display form (cf. DISPLAY_OVERRIDES for notes). Keyed by brand_key.
 BRAND_DISPLAY_OVERRIDES = {
     "dsdurga": "D.S. & Durga",
+    "fredericmalle": "Frédéric Malle",
+}
+
+# Hand merges where sources name the same house with structurally different
+# words, out of brand_key's reach ("Editions de Parfums Frédéric Malle" on
+# Parfumo vs "Frederic Malle" on Fragrantica). brand_key -> target brand_key.
+BRAND_KEY_ALIASES = {
+    "editionsdeparfumsfredericmalle": "fredericmalle",
+    "fredericmalleeditionsdeparfums": "fredericmalle",
 }
 
 
@@ -238,8 +247,13 @@ def unify_brands(perfumes):
     for p in perfumes:
         groups[brand_key(p["brand"])][p["brand"]] += 1
 
-    # fold tiny digit-suffixed variants ("trudon1" from duplicate sitemap slugs)
     alias = {}
+    for k, target in BRAND_KEY_ALIASES.items():
+        if k in groups and target in groups:
+            alias[k] = target
+        elif k in groups:
+            print(f"brand alias target not in dataset: {k} -> {target}")
+    # fold tiny digit-suffixed variants ("trudon1" from duplicate sitemap slugs)
     for k, c in groups.items():
         m = re.fullmatch(r"(.+?)\d", k)
         if m and m.group(1) in groups and sum(c.values()) <= 3 <= sum(groups[m.group(1)].values()):
@@ -248,13 +262,14 @@ def unify_brands(perfumes):
         groups[target] += groups[k]
 
     canon = {k: c.most_common(1)[0][0] for k, c in groups.items() if k not in alias}
-    for k, target in alias.items():
-        canon[k] = canon[target]
+    # display overrides must land before alias keys copy their target's spelling
     for k, name in BRAND_DISPLAY_OVERRIDES.items():
         if k in canon:
             canon[k] = name
         else:
             print(f"brand override key not in dataset: {k}")
+    for k, target in alias.items():
+        canon[k] = canon[target]
 
     fixed = 0
     for p in perfumes:
@@ -275,6 +290,20 @@ MERGEABLE_CONC_KEYS = {norm_key(c) for c in [
     "Eau de Toilette", "Eau de Parfum", "Parfum", "Perfume", "Pure Perfume",
     "Pure Parfum", "Extrait", "Extrait de Parfum", "Parfum de Toilette",
     "Esprit de Parfum", "Eau de Cologne", "Cologne", "Toilet Water",
+    "Perfume Oil", "Huile de Parfum", "Huile Parfum", "Solid Perfume",
+    "Parfum Solide", "Profumo Solido", "Solid Fragrance", "Concreta",
+    "Liquid Balm", "Hair Mist", "Brume Cheveux", "Parfum Cheveux",
+    "Hair Perfume", "Hair Fragrance", "Body Mist", "Body Spray",
+    "Body Splash", "Fragrance Mist", "All-Over Spray", "Brume Parfumee",
+    "After Shave", "After-Shave Lotion", "Lotion Apres-Rasage",
+    "Apres-Rasage", "Rasierwasser", "Lozione Dopobarba",
+]}
+
+# The MERGEABLE values that are delivery formats rather than strengths. Within
+# a merged group the surviving card must carry the juice in its base format:
+# a Hair Mist / Perfume Oil / After Shave row may fold in, but must not become
+# the card's face (cf. fmt_suffixed for name-suffixed formats).
+FORMAT_CONC_KEYS = {norm_key(c) for c in [
     "Perfume Oil", "Huile de Parfum", "Huile Parfum", "Solid Perfume",
     "Parfum Solide", "Profumo Solido", "Solid Fragrance", "Concreta",
     "Liquid Balm", "Hair Mist", "Brume Cheveux", "Parfum Cheveux",
@@ -363,6 +392,7 @@ def build_dedup(perfumes):
                     continue
                 canon = min(era_rows, key=lambda p: (
                     p["id"] in fmt_suffixed,  # the surviving card must carry the base name
+                    norm_key(p["concentration"] or "") in FORMAT_CONC_KEYS,  # ...in its base format
                     p["rating"] is None or (p["ratingCount"] or 0) < 5,
                     p["source"] != "fragrantica",
                     p["id"],

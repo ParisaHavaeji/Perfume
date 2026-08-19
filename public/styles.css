@@ -265,32 +265,52 @@ body.has-hostbar main { padding-bottom: 140px; }
 .chooser .sub { margin: 8px 0 0; }
 
 /* ---------- smell list ---------- */
-/* 19px puts the finder line 36px below SMELL LIST (glyph to glyph); the
-   countline's -8px margin (see .countline) makes it sit the same 36px
-   below the finder line. */
-.list-page { padding-top: 19px; }
-.list-controls { display: flex; flex-direction: column; gap: 20px; }
+/* Symmetry around the topbar hairline: the finder line sits as far below
+   it as SMELL LIST sits above it (tuned glyph to glyph — the countline's
+   tap-target padding overhangs the line box, hence less than 10px here). */
+.list-page { padding-top: 2px; }
+/* 96px under the controls before results start — a beat and a half of the
+   64px card rhythm, so the finder reads as its own block; whitespace
+   separates, not hairlines. */
+.list-controls { display: flex; flex-direction: column; gap: 20px; margin-bottom: 96px; }
 
-/* three side-by-side finder fields (location / I like / I avoid);
-   stack to one column on narrow screens. Label and input share one line —
-   black label, dimmed placeholder, no hairline under the input.
-   The first column is sized so the middle field ("I like") starts at the
-   same x as the centered SMELL LIST wordmark: 50% minus half the wordmark
-   width (~28.5px) minus the 40px gap. */
-.finder-row { display: flex; flex-direction: column; gap: 24px; }
-.finder-field { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 8px 10px; }
+/* the finder line: the Sort control first, then the three finder fields
+   (location / I like / I avoid); stacks to one column on narrow screens.
+   Label and input share one line — black label, dimmed placeholder, no
+   hairline under the input. --finder-label-w fixes the label column on
+   mobile so all four rows (Sort / Location / I like / I avoid) put their
+   values (and chip rows) at the same x. */
+.finder-row { --finder-label-w: 62px; display: flex; flex-direction: column; gap: 24px; }
+.finder-field { display: grid; grid-template-columns: var(--finder-label-w) 1fr; align-items: baseline; gap: 8px 10px; }
 .finder-label { display: block; color: var(--ink); }
 .finder-field .search-box { border-bottom: none; padding-bottom: 0; }
-/* chips line up with the search bar's start (column 2), not the label */
-.finder-field .filter-chips { grid-column: 2; }
+/* chosen filters line up with the label's start, not the search bar's, and
+   sit a touch farther from their field line (8px row gap + 8px = 16px) than
+   from each other (10px) — the list reads as belonging to the label above */
+.finder-field .filter-chips { grid-column: 1 / -1; margin-top: 8px; }
 .ta-anchor { position: relative; } /* dropdown hangs off the search bar, not the whole field */
+/* the countline is a pseudo-field: "Sort" in the label column, the value
+   (a cycling button) in the input column, same grid as .finder-field */
+.finder-row .countline {
+  display: grid; grid-template-columns: var(--finder-label-w) auto;
+  align-items: baseline; gap: 8px 10px; justify-content: start;
+  margin: 0; padding: 0;
+}
 @media (min-width: 640px) {
+  /* First column solved so the "I like" label STARTS on the same vertical
+     line as the centered SMELL LIST in the topbar (left edges aligned, not
+     centers): third-column start = center − SMELL LIST half-width, and with
+     three 1fr field columns and 40px gaps that gives
+     col1 = 25% − 1.5·gap − 1.5·half-width (≈43px, glyph-tuned to the 10px
+     Helvetica "SMELL LIST" ≈ 57px wide).
+     min-content keeps the Sort control from being crushed when narrow. */
   .finder-row {
     display: grid;
-    grid-template-columns: calc(50% - 68.5px) 1fr 1fr;
-    align-items: start; gap: 40px;
+    grid-template-columns: minmax(min-content, calc(25% - 60px - 43px)) 1fr 1fr 1fr;
+    align-items: baseline; gap: 40px;
   }
-  .finder-field { min-width: 0; }
+  .finder-field { min-width: 0; grid-template-columns: auto 1fr; }
+  .finder-row .countline { grid-template-columns: auto auto; }
 }
 
 .chip .area { color: var(--faint); }
@@ -337,12 +357,19 @@ body.has-hostbar main { padding-bottom: 140px; }
 .filter-chips .chip::after { content: '×'; margin-left: 6px; color: var(--faint); }
 .filter-chips .chip:hover::after { color: var(--ink); }
 
-/* The count line IS the controls: underlined words are buttons. The inline
-   buttons' vertical padding grows the tap target but also inflates the line
-   box, pushing the text down; the -8px top margin cancels that so the
-   countline sits 36px below the finder line (glyph to glyph) — the same
-   space as between SMELL LIST and the finder line. */
-.countline { margin: -8px 0 0; padding: 10px 0; }
+/* The sort line: "Sort" plus the underlined match count, either opening a
+   dropdown with the three sort options. It sits inside the finder row
+   (before Location); the row's baseline alignment keeps its glyphs level
+   with the finder labels despite the buttons' tap-target padding. */
+.countline { margin: 0; padding: 0; position: relative; }
+.countline .sort-open {
+  background: none; border: none; padding: 8px 0; margin: 0;
+  color: var(--ink); cursor: pointer; text-align: left;
+}
+/* options hang below the whole line, flush with the Sort label like the
+   chip lists under the other fields; the current sort is the inversion */
+.sort-menu { right: auto; min-width: max-content; border-top: 1px solid var(--faint); }
+.sort-menu .ta-row[aria-pressed="true"] .ta-name { background: var(--ink); color: var(--bg); }
 .countline .lnk {
   background: none; border: none; padding: 8px 1px; margin: 0; color: var(--ink); cursor: pointer;
   text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px;
@@ -384,10 +411,14 @@ body.has-hostbar main { padding-bottom: 140px; }
 /* one line per tier (top / middle / base); a long tier still wraps within its row.
    Grid rows stretch every card to the row's tallest (longest notes list), so the
    equal auto margins park SMELL on the shared bottom edge and center the notes
-   in whatever room that card has between its rating and its SMELL. */
+   in whatever room that card has between its rating and its SMELL.
+   width: max-content shrinks the box to its notes, and the 85% cap keeps a
+   wrapping box off the card's edges — either way the box itself sits centered
+   under the name (the card's align-items), never flush left. */
 .card .nrun {
   display: grid; grid-template-columns: max-content 1fr; align-items: baseline;
-  gap: 8px 20px; max-width: 440px; text-align: left; margin: auto 0;
+  gap: 8px 20px; width: max-content; max-width: min(440px, 85%);
+  text-align: left; margin: auto 0;
 }
 /* each row contributes its tier word and its notes straight to the grid, so the
    widest word (middle) sizes the label column and every notes line starts flush

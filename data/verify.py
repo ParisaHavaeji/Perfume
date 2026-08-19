@@ -4,7 +4,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from clean_dataset import BRAND_DISPLAY_OVERRIDES, TIER2_FORMAT_KEYS
+from clean_dataset import BRAND_DISPLAY_OVERRIDES, FORMAT_CONC_KEYS, TIER2_FORMAT_KEYS
 from poison import POISON_KEYS
 from textnorm import norm_key
 
@@ -132,6 +132,7 @@ for s, c in sup.items():
 
 def pick_key(p, base):
     return (norm_key(p["name"]) != base,  # base name first
+            norm_key(p["concentration"] or "") in FORMAT_CONC_KEYS,  # then base format
             p["rating"] is None or (p["ratingCount"] or 0) < 5,  # then gate-passing rating
             p["source"] != "fragrantica",
             p["id"])
