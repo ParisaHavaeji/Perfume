@@ -525,45 +525,47 @@ function renderTypeahead(field) {
     const bVocab = scopedBrandsVocab ?? brandsVocab;
     const nCount = scopedNoteCountByNorm ?? noteCountByNorm;
     const bCount = scopedBrandCount ?? brandCount;
-    // With a store picked the vocab is scoped to its shelf, so browse mode can
-    // afford a deeper list — the counts are all real matches there.
-    const noteCap = t || F.store ? 8 : 3;
+    // Suggestions never repeat something already chosen (either side — want
+    // vs avoid is exclusive anyway), and browse mode always pads back up to
+    // the cap from the vocab's top, so picking a suggestion surfaces the next
+    // one instead of shrinking the list toward empty. Curated picks recount
+    // under the scoped vocab; ones absent from the scope (count 0) drop out
+    // rather than promising an empty result.
+    const noteCap = 8;
     const brandCap = t ? 5 : 3;
+    const chosenNotes = new Set([...F.wants, ...F.avoids].map(norm));
+    const chosenBrands = new Set([...F.brands, ...F.avoidBrands]);
     const notes = [];
+    const seenNotes = new Set();
+    const pushNote = (name, count) => {
+      const key = norm(name);
+      if (!count || seenNotes.has(key) || chosenNotes.has(key)) return;
+      seenNotes.add(key);
+      notes.push([name, count]);
+    };
     if (!t && field === 'avoid') {
-      // Curated defaults recount under the scoped vocab; ones absent from the
-      // scope (count 0) drop out rather than promising an empty result.
-      for (const name of DEFAULT_AVOID_NOTES) {
-        const count = nCount.get(norm(name));
-        if (count) notes.push([name, count]);
-      }
-      // At a store, pad the curated picks out with its own top notes.
-      if (F.store) {
-        const seen = new Set(notes.map(([name]) => norm(name)));
-        for (const [name, count] of nVocab) {
-          if (seen.has(norm(name))) continue;
-          notes.push([name, count]);
-          if (notes.length >= noteCap) break;
-        }
-      }
-    } else {
-      for (const [name, count] of nVocab) {
-        if (t && !norm(name).includes(t)) continue;
-        notes.push([name, count]);
-        if (notes.length >= noteCap) break;
-      }
+      for (const name of DEFAULT_AVOID_NOTES) pushNote(name, nCount.get(norm(name)));
+    }
+    for (const [name, count] of nVocab) {
+      if (notes.length >= noteCap) break;
+      if (t && !norm(name).includes(t)) continue;
+      pushNote(name, count);
     }
     const brands = [];
-    if (!flagship && !t) {
-      for (const name of field === 'want' ? DEFAULT_WANT_BRANDS : DEFAULT_AVOID_BRANDS) {
-        const count = bCount.get(name);
-        if (count) brands.push([name, count]);
+    const seenBrands = new Set();
+    const pushBrand = (name, count) => {
+      if (!count || seenBrands.has(name) || chosenBrands.has(name)) return;
+      seenBrands.add(name);
+      brands.push([name, count]);
+    };
+    if (!flagship) {
+      if (!t) {
+        for (const name of field === 'want' ? DEFAULT_WANT_BRANDS : DEFAULT_AVOID_BRANDS) pushBrand(name, bCount.get(name));
       }
-    } else if (!flagship) {
       for (const [name, count] of bVocab) {
-        if (!norm(name).includes(t)) continue;
-        brands.push([name, count]);
         if (brands.length >= brandCap) break;
+        if (t && !norm(name).includes(t)) continue;
+        pushBrand(name, count);
       }
     }
     const noteAttr = field === 'want' ? 'data-want' : 'data-avoid';
