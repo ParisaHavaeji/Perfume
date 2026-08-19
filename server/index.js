@@ -100,7 +100,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(searchIndexGzip());
     }
     if (req.method === 'GET' && pathname.startsWith('/img/')) {
-      return serveImage(Number(pathname.slice('/img/'.length)), res);
+      return await serveImage(Number(pathname.slice('/img/'.length)), res);
     }
     if (req.method === 'POST' && pathname === '/api/games') {
       const room = createRoom();

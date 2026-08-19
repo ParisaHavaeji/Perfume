@@ -20,6 +20,8 @@ const TYPE_BY_EXT = Object.fromEntries(Object.entries(EXT_BY_TYPE).map(([type, e
 
 /** id -> {state: 'pending'|'ready'|'failed', ext?} */
 const status = new Map();
+/** id -> promise that settles when an in-flight download finishes. */
+const inflight = new Map();
 
 export async function initImageCache() {
   await mkdir(CACHE_DIR, { recursive: true });
@@ -134,17 +136,25 @@ export function cacheImage(id, entry, onSettled) {
   const current = status.get(id)?.state;
   if (current === 'pending' || current === 'ready') return;
   status.set(id, { state: 'pending' });
-  download(id, entry)
+  const run = download(id, entry)
     .then((ext) => status.set(id, { state: 'ready', ext }))
     .catch((err) => {
       status.set(id, { state: 'failed' });
       console.warn(`image ${id}: ${err.message}`);
     })
-    .finally(() => onSettled?.(id));
+    .finally(() => {
+      inflight.delete(id);
+      onSettled?.(id);
+    });
+  inflight.set(id, run);
 }
 
 /** Serve a cached image, or 404. */
-export function serveImage(id, res) {
+export async function serveImage(id, res) {
+  // A browse page hands out /img/:id the moment it kicks off the download, so
+  // the browser's request usually races the fetch. Hold the response until the
+  // download settles instead of 404ing into the client's slow retry path.
+  if (status.get(id)?.state === 'pending') await inflight.get(id);
   const entry = status.get(id);
   if (entry?.state !== 'ready') {
     res.writeHead(404).end();
