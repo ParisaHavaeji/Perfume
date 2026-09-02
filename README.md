@@ -1,6 +1,6 @@
 # Smell Things
 
-I hosted a party where I made cocktails inspired by the perfumes I was digging at the time, and made this app as the party game for the evening. The game is live at **https://smellthing.parisahavaeji.com**. 
+I hosted a party where I made cocktails inspired by the perfumes I was digging at the time, and made this app as the party game for the evening. The game is live at **https://smellthings.parisahavaeji.com/**. 
 
 The host lines up perfumes, guests join from their phones, everyone smells the same scent strip and guesses which notes are in it. Each round ends with a reveal and a ranking, and the night ends with a winner.
 
@@ -29,9 +29,9 @@ The decoys are the quiet trick of the game. Fake notes are drawn from per-tier f
 
 ## The dataset
 
-71,772 perfumes merged from three sites: Fragrantica (46,677-- a Kaggle scrape plus a small refresh crawl before the site started blocking crawlers), Parfumo (23,437-- the TidyTuesday CSV plus a gap crawl, `data/parfumo_gap.py`, which matches Parfumo's sitemaps against the dataset and politely fetches the 2024+ releases the older dumps predate), and Luckyscent (own crawl, 1,658 niche releases the databases miss-- I get my perfumes from their DTLA store so it was the most straight forward way of ensuring all my perfumes were listed). Most have a top/middle/base pyramid; 2,716 list their notes flat and get a single-column interface in the game. If a perfume is still missing, the host can add it mid-game by pasting its parfumo.com link.
+71,772 perfumes merged from three sites: Fragrantica (46,677-- a Kaggle scrape plus a small refresh crawl before the site started blocking crawlers), Parfumo (23,437-- the TidyTuesday CSV plus a gap crawl, `data/parfumo_gap.py`, which matches Parfumo's sitemaps against the dataset and politely fetches the 2024+ releases the older dumps predate), and Luckyscent (own crawl, 1,658 niche releases the databases miss-- I get my perfumes from their DTLA store so it was the most straight forward way of ensuring all my perfumes were listed). Most have a top/middle/base pyramid; 2,716 list their notes flat and get a single-column interface in the game.
 
-Pasted perfumes are meant to stay in the dataset for good. Locally that happens on its own (the record lands in `data/raw/parfumo_new.jsonl`, which the pipeline merges and the server replays at boot). On Render the free-tier disk resets on every restart, so the server also commits each add back to this repo over the GitHub API; set a `GITHUB_TOKEN` environment variable in the Render dashboard (a fine-grained personal access token with read/write access to this repo's Contents) to turn that on. `render.yaml` tells Render not to redeploy on those data-only commits, so an add during a game night won't restart the server. Without the token, a pasted perfume still works for the night but disappears when the instance next restarts.
+There used to be a mid-game "paste a parfumo.com link" flow for missing perfumes, but Parfumo serves deliberately falsified notes to scripted fetches (see `data/DATASET_NOTES.md`), so the feature is removed until it can be rebuilt on a source that doesn't play those games.
 
 The build emits `data/out/search_index.json` for the perfume picker, `data/out/notes/<n>.json` in shards of 1,000 so nothing loads the whole thing, and `data/out/notes_vocab.json` with per-tier note frequencies, which is what makes the decoys believable. Bottle images come from Fragrantica's CDN by id, or from the product page's og:image, fetched once and cached in `cache/images/`.
 

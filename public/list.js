@@ -517,7 +517,9 @@ function renderTypeahead(field) {
     // I like / I avoid share one shape: notes then brands. Browse mode (empty
     // box) shows curated defaults — top notes for I like, the classic
     // love-or-hate notes for I avoid, niche picks vs designer staples for
-    // brands; a typed query gets the deeper search caps over the full vocabs.
+    // brands; a typed query searches the full vocabs uncapped (the caps exist
+    // to keep browsing short, not to hide matches — count-desc order was
+    // burying small exact-name brands under bigger substring hits).
     // At a flagship the whole store is one brand, so brand filters can only be
     // redundant or empty — the Brands section disappears entirely.
     const flagship = F.store != null && storeById.get(F.store)?.kind === 'flagship';
@@ -532,7 +534,22 @@ function renderTypeahead(field) {
     // under the scoped vocab; ones absent from the scope (count 0) drop out
     // rather than promising an empty result.
     const noteCap = 8;
-    const brandCap = t ? 5 : 3;
+    const brandCap = 3;
+    // Typed matches rank exact name first, then prefix, then substring — each
+    // tier keeping the vocab's count-desc order — so typing a brand's full
+    // name always surfaces it on top.
+    const rank = (vocab) => {
+      const exact = [];
+      const prefix = [];
+      const within = [];
+      for (const row of vocab) {
+        const n = norm(row[0]);
+        if (n === t) exact.push(row);
+        else if (n.startsWith(t)) prefix.push(row);
+        else if (n.includes(t)) within.push(row);
+      }
+      return [...exact, ...prefix, ...within];
+    };
     const chosenNotes = new Set([...F.wants, ...F.avoids].map(norm));
     const chosenBrands = new Set([...F.brands, ...F.avoidBrands]);
     const notes = [];
@@ -546,9 +563,8 @@ function renderTypeahead(field) {
     if (!t && field === 'avoid') {
       for (const name of DEFAULT_AVOID_NOTES) pushNote(name, nCount.get(norm(name)));
     }
-    for (const [name, count] of nVocab) {
-      if (notes.length >= noteCap) break;
-      if (t && !norm(name).includes(t)) continue;
+    for (const [name, count] of t ? rank(nVocab) : nVocab) {
+      if (!t && notes.length >= noteCap) break;
       pushNote(name, count);
     }
     const brands = [];
@@ -562,9 +578,8 @@ function renderTypeahead(field) {
       if (!t) {
         for (const name of field === 'want' ? DEFAULT_WANT_BRANDS : DEFAULT_AVOID_BRANDS) pushBrand(name, bCount.get(name));
       }
-      for (const [name, count] of bVocab) {
-        if (brands.length >= brandCap) break;
-        if (t && !norm(name).includes(t)) continue;
+      for (const [name, count] of t ? rank(bVocab) : bVocab) {
+        if (!t && brands.length >= brandCap) break;
         pushBrand(name, count);
       }
     }

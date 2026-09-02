@@ -32,6 +32,13 @@ from textnorm import brand_key, norm_key, split_notes, titlecase_slug
 DATA = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(DATA, "raw")
 
+# Parfumo poisons scripted fetches with PLAUSIBLE fake notes/ratings that the
+# poison.py fingerprint cannot catch (confirmed 2026-09-02: "Somewhere but
+# Nowhere" by Lore — see DATASET_NOTES.md). Until each row is re-verified
+# through a real browser fetch, every note list obtained by scripted Parfumo
+# crawling (gap crawl + live game-night adds) is quarantined: dropped whole.
+QUARANTINE_SCRIPTED_PARFUMO = True
+
 FRA_URL = re.compile(r"/perfume/([^/]+)/([^/]+)-(\d+)\.html")
 FRA_TIER = re.compile(r"(?P<tier>[Tt]op|[Mm]iddle|[Bb]ase) notes? (?:are|is) (?P<notes>[^;.]*)")
 FRA_YEAR = re.compile(r"launched in (\d{4})")
@@ -196,7 +203,7 @@ def load_fragrantica_refresh():
 def load_parfumo_gap():
     """Batch gap-fill crawled from Parfumo (parfumo_gap.py, raw/parfumo_gap.jsonl)."""
     path = os.path.join(RAW, "parfumo_gap.jsonl")
-    if not os.path.exists(path):
+    if QUARANTINE_SCRIPTED_PARFUMO or not os.path.exists(path):
         return []
     out = []
     with open(path, encoding="utf-8") as f:
@@ -233,13 +240,46 @@ def load_parfumo_gap():
 def load_parfumo_new():
     """Live gap-fill adds from game night (server/parfumo.js, raw/parfumo_new.jsonl)."""
     path = os.path.join(RAW, "parfumo_new.jsonl")
-    if not os.path.exists(path):
+    if QUARANTINE_SCRIPTED_PARFUMO or not os.path.exists(path):
         return []
     out = []
     with open(path, encoding="utf-8") as f:
         for line in f:
             rec = json.loads(line)
             if not rec.get("notes"):
+                continue
+            structure, notes = tiers_to_entry(rec["notes"])
+            out.append(
+                {
+                    "name": rec["name"],
+                    "brand": rec["brand"],
+                    "year": rec["year"],
+                    "gender": rec["gender"],
+                    "source": "parfumo",
+                    "structure": structure,
+                    "notes": notes,
+                    "url": rec["url"],  # for og:image lookup
+                    "concentration": None,
+                    "rating": None,
+                    "ratingCount": None,
+                }
+            )
+    return out
+
+
+def load_parfumo_verified():
+    """Rows re-admitted from the scripted-parfumo quarantine after a human
+    check against the live page (DATASET_NOTES.md re-verification protocol).
+    Same record shape as parfumo_new.jsonl plus a `verified` stamp; not gated
+    by QUARANTINE_SCRIPTED_PARFUMO — that's the point of the file."""
+    path = os.path.join(RAW, "parfumo_verified.jsonl")
+    if not os.path.exists(path):
+        return []
+    out = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            rec = json.loads(line)
+            if not rec.get("notes") or not rec.get("verified"):
                 continue
             structure, notes = tiers_to_entry(rec["notes"])
             out.append(
@@ -380,7 +420,7 @@ def dedupe(perfumes):
 
 def main():
     # the refresh goes last so it only adds what the older dumps are missing
-    sources = [load_fragrantica(), load_parfumo(), load_luckyscent(), load_fragrantica_refresh(), load_parfumo_gap(), load_parfumo_new(), load_scentroom(), load_malingoetz(), load_elorea()]
+    sources = [load_fragrantica(), load_parfumo(), load_luckyscent(), load_fragrantica_refresh(), load_parfumo_gap(), load_parfumo_new(), load_parfumo_verified(), load_scentroom(), load_malingoetz(), load_elorea()]
     for chunk in sources:
         if chunk:
             print(f"{chunk[0]['source']}: {len(chunk)} with notes")

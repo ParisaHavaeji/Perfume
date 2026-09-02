@@ -8,8 +8,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { initData, searchIndexGzip } from './data.js';
-import { addFromUrl, AddPerfumeError } from './parfumo.js';
-import { replayLiveAdds } from './liveadds.js';
 import { initImageCache, serveImage } from './images.js';
 import { initSmellList, handleStores, handleNotesVocab, handleBrandsVocab, handleSmellList } from './smelllist.js';
 import { createRoom, getRoom, GameError, CODE_LENGTH, GAME_TITLE } from './rooms.js';
@@ -94,7 +92,6 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, {
         'content-type': 'application/json; charset=utf-8',
         'content-encoding': 'gzip',
-        // short-lived: the index grows when a host adds a perfume by URL
         'cache-control': 'public, max-age=300',
       });
       return res.end(searchIndexGzip());
@@ -105,20 +102,6 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && pathname === '/api/games') {
       const room = createRoom();
       return sendJson(res, 201, { code: room.code, hostKey: room.hostKey });
-    }
-    if (req.method === 'POST' && pathname === '/api/perfumes') {
-      const body = await readJsonBody(req);
-      const room = body ? getRoom(body.code) : null;
-      if (!room || body.hostKey !== room.hostKey) {
-        return sendJson(res, 403, { error: 'Only a game host can add perfumes.' });
-      }
-      try {
-        const { entry, existed } = await addFromUrl(body.url);
-        return sendJson(res, existed ? 200 : 201, { entry, existed });
-      } catch (err) {
-        if (err instanceof AddPerfumeError) return sendJson(res, err.status, { error: err.message });
-        throw err;
-      }
     }
     if (req.method === 'GET' && pathname.startsWith('/api/games/')) {
       const room = getRoom(pathname.slice('/api/games/'.length));
@@ -227,8 +210,5 @@ wss.on('connection', (ws) => {
 });
 
 await Promise.all([initImageCache(), initData()]);
-// smelllist registers its live-add hook before replay, so replayed live adds
-// flow through it; its boot heap measurement must also precede replayLiveAdds.
 await initSmellList();
-await replayLiveAdds();
 server.listen(PORT, () => console.log(`smell-things listening on http://localhost:${PORT}`));

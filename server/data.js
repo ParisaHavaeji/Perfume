@@ -91,7 +91,9 @@ const STRUCTURE_CHAR = { pyramid: 'p', flat: 'f', partial: 'x' };
 
 /**
  * Append a perfume to the live dataset: memory, search_index.json, and its
- * notes shard. Caller (parfumo.js) serializes calls — no concurrent adds.
+ * notes shard. Currently unused — kept (with findByUrl and the onPerfumeAdded
+ * hook) for the future live-add flow that will replace the removed Parfumo
+ * one. Callers must serialize calls — no concurrent adds.
  * @returns {Promise<object>} the new search-index entry {i, n, b, y, s}
  */
 export async function addPerfume({ name, brand, year, structure, notes, url }) {
