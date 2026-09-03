@@ -239,6 +239,7 @@ function searchPerfumes(query, limit = 20) {
   const wordStart = new RegExp(`\\b${tokens[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
   const scored = [];
   for (const p of searchIndex) {
+    if (p.x) continue; // suppressed duplicate variant (dedup.json)
     if (!tokens.every((t) => p.h.includes(t))) continue;
     let score = p.h.startsWith(tokens[0]) || p.bl.startsWith(tokens[0]) ? 2 : 0;
     if (wordStart.test(p.h)) score += 1;

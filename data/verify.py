@@ -1,6 +1,7 @@
 """Sanity checks for the pipeline output. Run after clean_dataset.py; exits 1 on failure."""
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -23,14 +24,47 @@ def check(ok, msg):
 with open(os.path.join(DATA, "perfumes.json"), encoding="utf-8") as f:
     perfumes = json.load(f)
 
-check(len(perfumes) > 65000, f"dataset size: {len(perfumes)}")
+check(len(perfumes) > 80000, f"dataset size: {len(perfumes)}")
+
+# Provenance (plan S6/S7): every row carries a trust stamp, and the levels
+# present are exactly the shippable set — "quarantined" must never ship, and
+# all three shippable levels are expected (fragrantica/luckyscent/... rows are
+# trusted, TidyTuesday parfumo rows are a third-party scrape, and at least
+# one human-checked parfumo re-entry exists).
+check(set(p.get("trust") for p in perfumes) == {"trusted", "third-party-scrape", "verified"},
+      "trust levels present are exactly the shippable set")
+
+# urlKey uniqueness (plan S7): the one collision-free identity in the dataset.
+# Mirrors urlKey in server/data.js: protocol off, one trailing slash off,
+# underscores to hyphens, lowercased.
+
+
+def url_key(u):
+    u = re.sub(r"^https?://", "", u, flags=re.I)
+    if u.endswith("/"):
+        u = u[:-1]
+    return u.replace("_", "-").lower()
+
+
+url_keys = [url_key(p["url"]) for p in perfumes if p.get("url")]
+check(len(url_keys) == len(set(url_keys)),
+      f"urlKey unique across all url-bearing rows ({len(url_keys)} rows)")
 check(all(p["id"] == i for i, p in enumerate(perfumes)), "ids are contiguous and ordered")
 check(all(p["structure"] in ("pyramid", "flat", "partial") for p in perfumes), "structures valid")
 check(all(any(p["notes"].values()) for p in perfumes), "every perfume has at least one note")
-check(all(p.get("fid") or p.get("url") for p in perfumes), "every perfume has an image reference")
+# Image coverage (plan S10): rdemarqui rows carry neither fid nor url — the
+# every-perfume-has-an-image invariant becomes a floor, and only rdemarqui
+# may sit under it (every other source still guarantees a reference). At
+# merge time attach_fids recovered a fid for ~41% of rdemarqui rows,
+# leaving ~12.4% of the dataset imageless.
+imageless = [p for p in perfumes if not (p.get("fid") or p.get("url"))]
+check(all(p["source"] == "rdemarqui" for p in imageless),
+      f"imageless rows ({len(imageless)}) all come from the rdemarqui source")
+check(len(imageless) < 0.15 * len(perfumes),
+      f"image reference coverage >= 85% ({len(perfumes) - len(imageless)}/{len(perfumes)})")
 
 flat = sum(p["structure"] == "flat" for p in perfumes)
-check(flat > 1500, f"flat-structure perfumes: {flat}")
+check(flat > 15000, f"flat-structure perfumes: {flat}")
 
 sauvage = next((p for p in perfumes if p["name"] == "Sauvage" and p["brand"] == "Dior"), None)
 check(sauvage is not None and sauvage["notes"]["top"], "Dior Sauvage present with top notes")
@@ -43,6 +77,9 @@ check(not any(p["brand"] == "Brand" for p in perfumes),
 dataset_brands = {p["brand"] for p in perfumes}
 check(all(v in dataset_brands for v in BRAND_DISPLAY_OVERRIDES.values()),
       "brand display overrides applied (D.S. & Durga et al.)")
+from build_stores import dataset_key
+check(len({dataset_key(b) for b in dataset_brands}) == len(dataset_brands),
+      "no two dataset brands share a dataset_key (designer-house folds applied)")
 
 vocab_notes = {n for p in perfumes for t in p["notes"].values() for n in t}
 check(not any(n[:1].islower() for n in vocab_notes), "no lowercase-leading note names")
@@ -79,7 +116,7 @@ scales = {"fragrantica": 5, "parfumo": 10}
 check(len(meta) == len(index), "find_meta length matches search index (at pipeline time)")
 check(all((m is None) == (p["rating"] is None or p["source"] not in scales)
           for m, p in zip(meta, perfumes)),
-      "find_meta null exactly when unrated (incl. all luckyscent)")
+      "find_meta null exactly when unrated (incl. all luckyscent/rdemarqui)")
 check(all(m is None or (0 <= m[0] <= m[1] == scales[p["source"]])
           for m, p in zip(meta, perfumes)),
       "find_meta ratings within [0, scale], scale matches source")
@@ -122,16 +159,25 @@ def base_key(name):
     return k
 
 
-check(all(base_key(perfumes[s]["name"]) == base_key(perfumes[c]["name"]) for s, c in sup.items()),
-      "suppressed and canonical share the base name key")
-
 dedup_groups = {}
 for s, c in sup.items():
     dedup_groups.setdefault(c, [c]).append(s)
 
 
+def group_base(ids):
+    """The group's base name key: the shortest member key after tier-2 format
+    stripping. Tier-3 line-prefix variants carry a longer key that must end
+    with it ("armanipriveirisceladon" vs "irisceladon")."""
+    return min((base_key(perfumes[i]["name"]) for i in ids), key=lambda k: (len(k), k))
+
+
+check(all(base_key(perfumes[i]["name"]).endswith(group_base(ids))
+          for ids in dedup_groups.values() for i in ids),
+      "every group member's base name key ends with the group base key")
+
+
 def pick_key(p, base):
-    return (norm_key(p["name"]) != base,  # base name first
+    return (norm_key(p["name"]) != base,  # base name first (format/prefix variants last)
             norm_key(p["concentration"] or "") in FORMAT_CONC_KEYS,  # then base format
             p["rating"] is None or (p["ratingCount"] or 0) < 5,  # then gate-passing rating
             p["source"] != "fragrantica",
@@ -139,7 +185,7 @@ def pick_key(p, base):
 
 
 bad_pick = [c for c, ids in dedup_groups.items()
-            if min(ids, key=lambda i: pick_key(perfumes[i], base_key(perfumes[c]["name"]))) != c]
+            if min(ids, key=lambda i: pick_key(perfumes[i], group_base(ids))) != c]
 check(not bad_pick, "canonical pick matches the pinned priority order")
 
 check(union == [i for i in sorted(sup) if perfumes[i]["source"] != "parfumo"],

@@ -39,9 +39,13 @@ for (const file of await readdir(NOTES_DIR)) {
   if (!file.endsWith('.json')) continue;
   const shard = JSON.parse(await readFile(path.join(NOTES_DIR, file), 'utf8'));
   for (const [id, entry] of Object.entries(shard)) {
-    if (!entry.url || entry.fid != null) continue; // fid entries self-warm on Render
+    if (!entry.url) continue;
+    // Every url-bearing entry counts as live for the orphan report — shards
+    // dual-emit fid AND url since plan S5, and a seed whose entry later gained
+    // a fid is still in use (download() checks the seed first).
     const key = urlSeedKey(entry.url);
     liveKeys.add(key);
+    if (entry.fid != null) continue; // fid entries self-warm on Render; only url-source images seed
     let cachedExt = null;
     for (const ext of EXTS) {
       if (await fileExists(path.join(CACHE_DIR, `${id}${ext}`))) { cachedExt = ext; break; }

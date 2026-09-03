@@ -1,0 +1,113 @@
+{
+ "store": "sephora",
+ "method": "in_store_facet",
+ "locations": [
+  {
+   "name": "USC Village & nearby",
+   "store_id": "2072",
+   "cluster": true,
+   "urls": [
+    "https://www.sephora.com/shop/perfume?ref=filters[Pickup]=2072",
+    "https://www.sephora.com/shop/cologne?ref=filters[Pickup]=2072"
+   ],
+   "facet": "Filter & Sort dialog (rail Brand → Show more) → In Store & Delivery → checkbox value filters[Pickup]=2072 'In Store: USC VILLAGE & nearby'; Brand list read with 'View A-Z'. The Choose a Store dialog converts into the Sign In modal for anonymous visitors (3 tries), so the geo-default cluster was kept.",
+   "shown": {
+    "perfume": 64,
+    "cologne": 27
+   },
+   "baseline_items": {
+    "perfume": [
+     1010,
+     668
+    ],
+    "cologne": [
+     428,
+     275
+    ],
+    "note": "unfiltered Brand facet sizes 85 (perfume) / 40 (cologne)"
+   },
+   "reads": [
+    "2026-09-03"
+   ],
+   "brands": [
+    "Ariana Grande",
+    "Armani Beauty",
+    "Azzaro",
+    "BORNTOSTANDOUT",
+    "Boy Smells",
+    "BROWN GIRL Jane",
+    "BURBERRY",
+    "By Rosie Jane",
+    "Carolina Herrera",
+    "Ceremonia",
+    "CHANEL",
+    "Chloé",
+    "CLEAN RESERVE",
+    "Commodity",
+    "CYKLAR",
+    "DedCool",
+    "DIOR",
+    "DolceGabbana",
+    "EILISH FRAGRANCES",
+    "Ellis Brooklyn",
+    "Fenty Beauty by Rihanna",
+    "FORVR MOOD",
+    "FUGAZZI",
+    "Gisou",
+    "Glossier",
+    "Gucci",
+    "Henry Rose",
+    "HERMÈS",
+    "HUDA BEAUTY",
+    "Jean Paul Gaultier",
+    "JIMMY CHOO",
+    "Jo Malone London",
+    "Juliette has a gun",
+    "KAYALI",
+    "KILIAN Paris",
+    "LORE",
+    "LoveShackFancy",
+    "Maison Louis Marie",
+    "Maison Margiela",
+    "Marc Jacobs Beauty",
+    "MERIT",
+    "Miu Miu",
+    "Montale",
+    "Moroccanoil",
+    "NEST New York",
+    "Nette",
+    "OUAI",
+    "PHLUR",
+    "Prada",
+    "Rabanne",
+    "Rare Beauty by Selena Gomez",
+    "Sephora Favorites",
+    "SKYLAR",
+    "Sol de Janeiro",
+    "Summer Fridays",
+    "The 7 Virtues",
+    "TOM FORD",
+    "Touchland",
+    "U Beauty",
+    "Valentino",
+    "Versace",
+    "ViktorRolf",
+    "VIOLETTE_FR",
+    "World of Chris Collins",
+    "Yves Saint Laurent"
+   ]
+  }
+ ],
+ "aliases": {
+  "Armani Beauty": "Giorgio Armani",
+  "EILISH FRAGRANCES": "Billie Eilish",
+  "KILIAN Paris": "By Kilian",
+  "Marc Jacobs Beauty": "Marc Jacobs",
+  "NEST New York": "Nest",
+  "Rare Beauty by Selena Gomez": "Rare Beauty",
+  "World of Chris Collins": "Chris Collins"
+ },
+ "ignore": [
+  "Sephora Favorites"
+ ]
+}

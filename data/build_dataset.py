@@ -16,6 +16,9 @@ Sources, in priority order (first one to claim a brand+name wins):
   8. Malin+Goetz (raw/malingoetz_catalog.jsonl) — the brand's own fragrance
      pages via malingoetz_refresh.py (the malin-goetz flagship assortment;
      absent from every other source)
+  9. rdemarqui (raw/rdemarqui_perfumes.xlsx) — a ~2023 third-party Fragrantica
+     scrape (github.com/rdemarqui/perfume_recommender), flat notes only;
+     merged last (DATASET_NOTES.md plan S10) so it only fills unclaimed keys
 
 Run clean_dataset.py afterwards to normalize and emit the browser-ready files.
 """
@@ -32,12 +35,35 @@ from textnorm import brand_key, norm_key, split_notes, titlecase_slug
 DATA = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(DATA, "raw")
 
-# Parfumo poisons scripted fetches with PLAUSIBLE fake notes/ratings that the
-# poison.py fingerprint cannot catch (confirmed 2026-09-02: "Somewhere but
-# Nowhere" by Lore — see DATASET_NOTES.md). Until each row is re-verified
-# through a real browser fetch, every note list obtained by scripted Parfumo
-# crawling (gap crawl + live game-night adds) is quarantined: dropped whole.
-QUARANTINE_SCRIPTED_PARFUMO = True
+# Provenance trust (plan S6, 2026-09-02). Trust is a pure function of WHICH
+# RAW FILE a row came from — the pipeline rebuilds from raw every run, so a
+# trust field stored in the raw files would drift. This dict mirrors the
+# source-trust table at the top of DATASET_NOTES.md; each loader stamps its
+# rows, and main() drops every non-shippable row (with printed counts) before
+# any merging — a quarantined row must never claim a brand+name key that a
+# shippable source could fill.
+#
+# Why "quarantined": Parfumo poisons scripted fetches with PLAUSIBLE fake
+# notes/ratings that the poison.py fingerprint cannot catch (confirmed
+# 2026-09-02: "Somewhere but Nowhere" by Lore — see DATASET_NOTES.md). Until
+# re-verified through a real browser fetch, scripted-Parfumo rows drop whole.
+# "third-party-scrape": someone else's scripted scrape of the same site —
+# ships (26% of the dataset, mostly pre-2024) but may carry plausible poison
+# at an unknown rate; no invariant may call these rows verified.
+SOURCE_TRUST = {
+    "fra_perfumes.csv": "trusted",
+    "parfumo_tidytuesday.csv": "third-party-scrape",
+    "luckyscent_notes.jsonl": "trusted",
+    "fragrantica_new.jsonl": "trusted",
+    "parfumo_gap.jsonl": "quarantined",
+    "parfumo_new.jsonl": "quarantined",
+    "parfumo_verified.jsonl": "verified",
+    "scentroom_catalog.jsonl": "trusted",
+    "malingoetz_catalog.jsonl": "trusted",
+    "elorea_catalog.jsonl": "trusted",
+    "rdemarqui_perfumes.xlsx": "third-party-scrape",
+}
+SHIPPABLE_TRUST = {"trusted", "third-party-scrape", "verified"}
 
 FRA_URL = re.compile(r"/perfume/([^/]+)/([^/]+)-(\d+)\.html")
 FRA_TIER = re.compile(r"(?P<tier>[Tt]op|[Mm]iddle|[Bb]ase) notes? (?:are|is) (?P<notes>[^;.]*)")
@@ -86,6 +112,7 @@ def load_fragrantica():
                 "year": int(ym.group(1)) if ym else None,
                 "gender": str(row.Gender).replace("for ", "") if pd.notna(row.Gender) else None,
                 "source": "fragrantica",
+                "trust": SOURCE_TRUST["fra_perfumes.csv"],
                 "structure": structure,
                 "notes": notes,
                 # bottle image: https://fimgs.net/mdimg/perfume/375x500.<fid>.jpg
@@ -124,6 +151,7 @@ def load_parfumo():
                 "year": int(row.Release_Year) if pd.notna(row.Release_Year) else None,
                 "gender": None,
                 "source": "parfumo",
+                "trust": SOURCE_TRUST["parfumo_tidytuesday.csv"],
                 "structure": structure,
                 "notes": notes,
                 "url": str(row.URL) if pd.notna(row.URL) else None,  # for og:image lookup
@@ -159,6 +187,7 @@ def load_luckyscent():
                     "year": None,
                     "gender": None,
                     "source": "luckyscent",
+                    "trust": SOURCE_TRUST["luckyscent_notes.jsonl"],
                     "structure": "flat",
                     "notes": {"flat": notes},
                     "url": f"https://www.luckyscent.com/products/{rec['slug']}",
@@ -189,6 +218,7 @@ def load_fragrantica_refresh():
                     "year": rec["year"],
                     "gender": rec["gender"],
                     "source": "fragrantica",
+                    "trust": SOURCE_TRUST["fragrantica_new.jsonl"],
                     "structure": structure,
                     "notes": notes,
                     "fid": rec["fid"],
@@ -201,9 +231,11 @@ def load_fragrantica_refresh():
 
 
 def load_parfumo_gap():
-    """Batch gap-fill crawled from Parfumo (parfumo_gap.py, raw/parfumo_gap.jsonl)."""
+    """Batch gap-fill crawled from Parfumo (parfumo_gap.py, raw/parfumo_gap.jsonl).
+    Trust: quarantined — loaded for visibility, dropped whole by main()'s
+    trust filter until rows pass the DATASET_NOTES.md re-verification protocol."""
     path = os.path.join(RAW, "parfumo_gap.jsonl")
-    if QUARANTINE_SCRIPTED_PARFUMO or not os.path.exists(path):
+    if not os.path.exists(path):
         return []
     out = []
     with open(path, encoding="utf-8") as f:
@@ -223,6 +255,7 @@ def load_parfumo_gap():
                     "year": rec["year"],
                     "gender": rec.get("gender"),
                     "source": "parfumo",
+                    "trust": SOURCE_TRUST["parfumo_gap.jsonl"],
                     "structure": structure,
                     "notes": notes,
                     "url": rec["url"],  # for og:image lookup
@@ -238,9 +271,11 @@ def load_parfumo_gap():
 
 
 def load_parfumo_new():
-    """Live gap-fill adds from game night (server/parfumo.js, raw/parfumo_new.jsonl)."""
+    """Live gap-fill adds from game night (the removed server/parfumo.js flow,
+    raw/parfumo_new.jsonl — now empty, kept as a schema anchor).
+    Trust: quarantined — dropped whole by main()'s trust filter."""
     path = os.path.join(RAW, "parfumo_new.jsonl")
-    if QUARANTINE_SCRIPTED_PARFUMO or not os.path.exists(path):
+    if not os.path.exists(path):
         return []
     out = []
     with open(path, encoding="utf-8") as f:
@@ -256,6 +291,7 @@ def load_parfumo_new():
                     "year": rec["year"],
                     "gender": rec["gender"],
                     "source": "parfumo",
+                    "trust": SOURCE_TRUST["parfumo_new.jsonl"],
                     "structure": structure,
                     "notes": notes,
                     "url": rec["url"],  # for og:image lookup
@@ -271,7 +307,7 @@ def load_parfumo_verified():
     """Rows re-admitted from the scripted-parfumo quarantine after a human
     check against the live page (DATASET_NOTES.md re-verification protocol).
     Same record shape as parfumo_new.jsonl plus a `verified` stamp; not gated
-    by QUARANTINE_SCRIPTED_PARFUMO — that's the point of the file."""
+    trust: verified — outside the quarantine, that's the point of the file."""
     path = os.path.join(RAW, "parfumo_verified.jsonl")
     if not os.path.exists(path):
         return []
@@ -289,6 +325,7 @@ def load_parfumo_verified():
                     "year": rec["year"],
                     "gender": rec["gender"],
                     "source": "parfumo",
+                    "trust": SOURCE_TRUST["parfumo_verified.jsonl"],
                     "structure": structure,
                     "notes": notes,
                     "url": rec["url"],  # for og:image lookup
@@ -323,6 +360,7 @@ def load_scentroom():
                     "year": None,
                     "gender": None,
                     "source": "scentroom",
+                    "trust": SOURCE_TRUST["scentroom_catalog.jsonl"],
                     "structure": structure,
                     "notes": notes,
                     "url": f"https://www.thescentroom.com/products/{rec['handle']}",
@@ -355,6 +393,7 @@ def load_malingoetz():
                     "year": None,
                     "gender": None,
                     "source": "malingoetz",
+                    "trust": SOURCE_TRUST["malingoetz_catalog.jsonl"],
                     "structure": structure,
                     "notes": notes,
                     "url": rec["url"],  # for og:image lookup
@@ -392,6 +431,7 @@ def load_elorea():
                     "year": None,
                     "gender": None,
                     "source": "elorea",
+                    "trust": SOURCE_TRUST["elorea_catalog.jsonl"],
                     "structure": structure,
                     "notes": notes,
                     "url": rec["url"],  # for og:image lookup
@@ -400,6 +440,54 @@ def load_elorea():
                     "ratingCount": None,
                 }
             )
+    return out
+
+
+RD_UNESC = re.compile(r"\\u([0-9a-fA-F]{4})")  # the xlsx holds literal "é" escapes
+RD_TITLE = re.compile(r"(^|[\s\-(])([a-z])")
+
+
+def load_rdemarqui():
+    """rdemarqui's Fragrantica scrape (raw/rdemarqui_perfumes.xlsx, ~2023,
+    github.com/rdemarqui/perfume_recommender — plan S10). Three columns:
+    brand, perfume, flat comma-joined notes; no pyramid/year/rating/url/fid,
+    so rows come in flat like Luckyscent's and image-less unless attach_fids
+    recovers a fid by brand+name (~43% of its new rows at merge time).
+    Notes arrive lowercase (with stray literal unicode escapes) — decoded and
+    title-cased here so 36k rows of lowercase spellings can't flip the
+    canonical display casing in clean_dataset's most-common-spelling vote.
+    Decoy re-scan against the frozen poison.py pool on merge day: 0 hits."""
+    path = os.path.join(RAW, "rdemarqui_perfumes.xlsx")
+    if not os.path.exists(path):
+        return []
+    df = pd.read_excel(path)
+    out = []
+    for row in df.itertuples():
+        if pd.isna(row.brand) or pd.isna(row.perfume) or pd.isna(row.notes):
+            continue
+        raw_notes = RD_UNESC.sub(lambda m: chr(int(m.group(1), 16)), str(row.notes))
+        notes = []
+        for n in raw_notes.split(","):
+            n = RD_TITLE.sub(lambda m: m.group(1) + m.group(2).upper(), n.strip())
+            if n and n not in notes:
+                notes.append(n)
+        if not notes:
+            continue
+        out.append(
+            {
+                "name": str(row.perfume).strip(),
+                "brand": str(row.brand).strip(),
+                "year": None,
+                "gender": None,
+                "source": "rdemarqui",
+                "trust": SOURCE_TRUST["rdemarqui_perfumes.xlsx"],
+                "structure": "flat",
+                "notes": {"flat": notes},
+                "concentration": None,
+                "rating": None,
+                "ratingCount": None,
+            }
+        )
     return out
 
 
@@ -420,10 +508,23 @@ def dedupe(perfumes):
 
 def main():
     # the refresh goes last so it only adds what the older dumps are missing
-    sources = [load_fragrantica(), load_parfumo(), load_luckyscent(), load_fragrantica_refresh(), load_parfumo_gap(), load_parfumo_new(), load_parfumo_verified(), load_scentroom(), load_malingoetz(), load_elorea()]
+    sources = [load_fragrantica(), load_parfumo(), load_luckyscent(), load_fragrantica_refresh(), load_parfumo_gap(), load_parfumo_new(), load_parfumo_verified(), load_scentroom(), load_malingoetz(), load_elorea(), load_rdemarqui()]
     for chunk in sources:
         if chunk:
             print(f"{chunk[0]['source']}: {len(chunk)} with notes")
+
+    # The one trust gate (plan S6): non-shippable rows drop here, before any
+    # merging, so a quarantined row can't claim a brand+name key and shadow a
+    # legitimate row from a shippable source. (The plan text said "end of
+    # main()", but filtering after the merge would do exactly that shadowing.)
+    n_dropped = Counter()
+    for i, chunk in enumerate(sources):
+        kept = [p for p in chunk if p["trust"] in SHIPPABLE_TRUST]
+        for p in chunk:
+            if p["trust"] not in SHIPPABLE_TRUST:
+                n_dropped[p["trust"]] += 1
+        sources[i] = kept
+    print(f"non-shippable trust rows dropped: {dict(n_dropped) or 0}")
 
     # Parfumo rows carrying known decoy notes are dropped whole — the real
     # notes can't be told apart from the remaining fabrications (data/poison.py).

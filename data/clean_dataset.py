@@ -69,6 +69,12 @@ SYNONYM_KEYS = {
     "bergamo": "bergamot",
     # Elorea site typo (2026-08-18)
     "lilly of the valley": "lily of the valley",
+    # rdemarqui scrape typos (2026-09-02) — unambiguous misspellings of notes
+    # already in the vocab, spotted in the pre-merge unseen-token scan
+    "popocorn": "popcorn",
+    "oive leaf": "olive leaf",
+    "narciussus": "narcissus",
+    "massioa": "massoia",
 }
 
 # where the most-common spelling isn't the one we want
@@ -231,14 +237,149 @@ def clean_names(perfumes):
 BRAND_DISPLAY_OVERRIDES = {
     "dsdurga": "D.S. & Durga",
     "fredericmalle": "Frédéric Malle",
+    # S3 alias merges where the most-common spelling came out as Parfumo's
+    # joint "A / B" naming (or with mangled punctuation) — pin the clean form
+    "alabonfire": "A Lab on Fire",
+    "iprofumidifirenze": "I Profumi di Firenze",
+    "ensaroud": "Ensar Oud",
+    "miltonlloyd": "Milton-Lloyd",
+    # S11 designer-house folds (Parisa 2026-09-03: the modern names win even
+    # where the founder-name spelling out-votes them — Paco Rabanne 158 vs 5,
+    # Maison Martin Margiela 33 vs 26).
+    "dior": "Dior",
+    "mugler": "Mugler",
+    "goutal": "Goutal",
+    "aigner": "Aigner",
+    "gritti": "Gritti",
+    "rabanne": "Rabanne",
+    "maisonmargiela": "Maison Margiela",
+    "demeterfragrance": "Demeter Fragrance Library",
+    "reghens": "Reghen's Masters Perfumers",
+    "stephanehumbertlucas": "Stéphane Humbert Lucas 777",
+    # S10 (2026-09-02): the rdemarqui xlsx strips punctuation/diacritics from
+    # brand names, and its ~17.5k rows flipped the most-common-spelling vote
+    # for these — pin the real display forms ("Malin Goetz", "Kiehl s" etc.
+    # must not win). Casing-only flips ("Mad et Len") were kept as improvements.
+    "malingoetz": "Malin+Goetz",
+    "kiehls": "Kiehl's",
+    "crabtreeevelyn": "Crabtree & Evelyn",
+    "12parfumeursfrancais": "12 Parfumeurs Français",
+    "maurerwirtz": "Mäurer & Wirtz",
+    "lejardinretrouve": "Le Jardin Retrouvé",
+    "hamidioudperfumes": "Hamidi Oud & Perfumes",
+    "kellyjones": "Kelly + Jones",
+    "yvesdorgeval": "Yves d'Orgeval",
+    "geoftrumper": "Geo. F. Trumper",
+    "carolsdaughter": "Carol's Daughter",
+    "victoriassecret": "Victoria's Secret",
+    "velvetsweetpeaspurrfumery": "Velvet Sweet Pea's Purrfumery",
+    "uermi": "UÈRMÌ",
 }
 
 # Hand merges where sources name the same house with structurally different
 # words, out of brand_key's reach ("Editions de Parfums Frédéric Malle" on
 # Parfumo vs "Frederic Malle" on Fragrantica). brand_key -> target brand_key.
+# Expanded 2026-09-02 (remediation plan S3): every containment brand-key pair
+# sharing >=3 identical perfume names was generated mechanically and reviewed
+# by hand; approved pairs below. Deliberately NOT merged, because the
+# contained key is a distinct premium line whose same-named products carry
+# different juice: orientica/orienticapremium, myperfumes/myperfumesselect.
+# No chains allowed: every alias points directly at its final key
+# (unify_brands folds one level only).
 BRAND_KEY_ALIASES = {
     "editionsdeparfumsfredericmalle": "fredericmalle",
     "fredericmalleeditionsdeparfums": "fredericmalle",
+    "alharamainperfumes": "alharamain",
+    "spezieriepalazzovecchioiprofumidifirenze": "iprofumidifirenze",
+    "miltonlloydjeanyvescosmetics": "miltonlloyd",
+    "afnanperfumes": "afnan",
+    "jomalonelondon": "jomalone",
+    "neilmorrisfragrances": "neilmorris",
+    "zoologistperfumes": "zoologist",
+    "carnerbarcelona": "carner",
+    "lacostefragrances": "lacoste",
+    "bykilian": "kilian",
+    "korloffparis": "korloff",
+    "jovoyparis": "jovoy",
+    "atelierdartistesbyalexandrej": "alexandrej",
+    "parfumsberdoues": "berdoues",
+    "alfreddunhill": "dunhill",
+    "shaybluelondon": "shayblue",
+    "stephanehumbertlucas777": "stephanehumbertlucas",
+    "hautefragrancecompanyhfc": "hautefragrancecompany",
+    "dknydonnakaran": "donnakaran",
+    "chabaudmaisondeparfum": "chabaud",
+    "sospiroperfumes": "sospiro",
+    "jamesheeley": "heeley",
+    "reghensmastersperfumers": "reghens",
+    "memoizelondon": "memoize",
+    "michaelmalullondon": "michaelmalul",
+    "kkwfragrancekimkardashian": "kkwfragrance",
+    "maissaparfums": "maissa",
+    "lecouventmaisondeparfum": "lecouvent",
+    "schlossparfumeriewolffsohnstuttgart": "schlossparfumerie",
+    "lesliquidesimaginaires": "liquidesimaginaires",
+    "lattafaperfumes": "lattafa",
+    "juletmadparis": "juletmad",
+    "pierrebalmain": "balmain",
+    "mirkobuffinifirenze": "mirkobuffini",
+    "widianajarabia": "widian",
+    # Marcoccia == Officine del Profumo (Parfumo names them jointly); both
+    # partial keys and the joint key fold to one house
+    "marcocciaofficinedelprofumo": "marcoccia",
+    "officinedelprofumo": "marcoccia",
+    "tonicabaldrops": "tonicabal",
+    "antoniopuig": "puig",
+    "novaeplusscute": "novaeplus",
+    "kayalifragrances": "kayali",
+    "victorinoxswissarmy": "victorinox",
+    "stephaniedebruijnparfumsurmesure": "stephaniedebruijn",
+    "providenceperfumeco": "providenceperfume",
+    "nimereparfums": "nimere",
+    "hereticparfums": "heretic",
+    # "What We Do Is Secret" is A Lab on Fire's own rebrand/line — one house
+    "whatwedoissecretalabonfire": "alabonfire",
+    "whatwedoissecret": "alabonfire",
+    "tiffanyco": "tiffany",
+    "manzanaparis": "manzana",
+    "curvelizclaiborne": "lizclaiborne",
+    "sabemassonlesoftperfume": "sabemasson",
+    "kikomilano": "kiko",
+    "harajukuloversgwenstefani": "harajukulovers",
+    "goldfieldbanksaustralia": "goldfieldbanks",
+    "cubaparis": "cuba",
+    "ensaroudoriscent": "ensaroud",
+    "tonattoprofumi": "tonatto",
+    "pierreguillaumeparis": "pierreguillaume",
+    "pariselyseesleparfumbype": "pariselysees",
+    "jjunaidjamshed": "junaidjamshed",
+    "demeterfragrancelibrarythelibraryoffragrance": "demeterfragrance",
+    "parfumschristinedarvin": "christinedarvin",
+    "antoniobanderas": "banderas",
+    "profumumroma": "profumum",
+    "monothemevenezia": "monotheme",
+    "maisonmonadiorio": "monadiorio",
+    "michaelmichalsky": "michalsky",
+    "leparfumoirdegrasselynnederguybouchara": "guybouchara",
+    "goshcosmetics": "gosh",
+    "reefperfumes": "reef",
+    "newbrandparfums": "newbrand",
+    "masquemilano": "masque",
+    "lushcosmeticstogo": "lush",
+    "urodabies": "bies",
+    "maisonanthonymarminabdulkarimalfaransi": "abdulkarimalfaransi",
+    # S11 (2026-09-03, chain-stores amendment 4): rdemarqui's xlsx spells
+    # designer houses by founder name — the same perfumes as duplicate rows
+    # (260 of them, all rdemarqui, e.g. Dior "Addict To Life" twice). Fold onto
+    # the modern house name; display pinned in BRAND_DISPLAY_OVERRIDES.
+    "christiandior": "dior",
+    "thierrymugler": "mugler",
+    "annickgoutal": "goutal",
+    "etienneaigner": "aigner",
+    "drgritti": "gritti",
+    "pacorabanne": "rabanne",
+    "maisonmartinmargiela": "maisonmargiela",
+    "maisonmargielareplica": "maisonmargiela",
 }
 
 
@@ -365,8 +506,10 @@ def build_dedup(perfumes):
     """Map duplicate-variant id -> canonical id for the SMELL LIST layer.
     Suppressed rows keep their ids everywhere (shards, images, game); only
     /list hides them. Tier 1: same brand + name key. Tier 2: delivery-format
-    name suffix folding into an existing same-brand base. Groups subdivide by
-    non-mergeable concentration and by slug-pinned era before picking."""
+    name suffix folding into an existing same-brand base. Tier 3: line-prefix
+    variant folding (word-boundary name suffix + >=80% note overlap). Groups
+    subdivide by non-mergeable concentration and by slug-pinned era before
+    picking."""
     groups = defaultdict(list)
     for p in perfumes:
         groups[(p["brand"], norm_key(p["name"]))].append(p)
@@ -380,6 +523,52 @@ def build_dedup(perfumes):
                     groups[(brand, nk[: -len(fmt)])].append(p)
                 break
 
+    # Tier 3 (2026-09-02, plan S4): line-prefix variant folding — same brand,
+    # one name a word-boundary suffix of the other ("Armani Privé - Iris
+    # Céladon" vs "Iris Celadon", the "Ch. 1 - Blaze of Stillness" class no
+    # url/fid/exact-name key can see). Gated on >=80% note overlap so real
+    # flankers that merely share a name tail ("Delina Rose" vs "Rose") stay
+    # apart. Word-boundary via name tokens, not raw key suffix — "Montrose"
+    # must not fold into "Rose". Soft-suppress only, like every tier.
+    def note_set(p):
+        return {n.lower() for tier_notes in p["notes"].values() for n in tier_notes}
+
+    def best_overlap(g1, g2):
+        best = 0.0
+        for a in g1:
+            sa = note_set(a)
+            for b in g2:
+                sb = note_set(b)
+                m = min(len(sa), len(sb))
+                if m:
+                    best = max(best, len(sa & sb) / m)
+        return best
+
+    def name_tokens(name):
+        return tuple(t for t in (re.sub(r"[^a-z0-9]", "", ascii_fold(w).lower())
+                                 for w in str(name).split()) if t)
+
+    by_tokens = {}
+    for key, members in groups.items():
+        by_tokens.setdefault((key[0], name_tokens(members[0]["name"])), key)
+
+    prefix_folded = set()
+    # longest first so "a - b - c" folds into "b c" before "b c" folds into "c"
+    for brand, toks in sorted(by_tokens, key=lambda bt: (-len(bt[1]), bt[0], bt[1])):
+        key = by_tokens[(brand, toks)]
+        if key not in groups or len(toks) < 2:
+            continue
+        for i in range(1, len(toks)):
+            target = by_tokens.get((brand, toks[i:]))
+            if target is None or target == key or target not in groups:
+                continue
+            if best_overlap(groups[key], groups[target]) < 0.8:
+                continue
+            for p in groups.pop(key):
+                prefix_folded.add(p["id"])
+                groups[target].append(p)
+            break
+
     suppress = {}
     for members in groups.values():
         subs = defaultdict(list)
@@ -391,7 +580,9 @@ def build_dedup(perfumes):
                 if len(era_rows) < 2:
                     continue
                 canon = min(era_rows, key=lambda p: (
-                    p["id"] in fmt_suffixed,  # the surviving card must carry the base name
+                    # the surviving card must carry the base name (format- and
+                    # prefix-suffixed variants never become the face)
+                    p["id"] in fmt_suffixed or p["id"] in prefix_folded,
                     norm_key(p["concentration"] or "") in FORMAT_CONC_KEYS,  # ...in its base format
                     p["rating"] is None or (p["ratingCount"] or 0) < 5,
                     p["source"] != "fragrantica",
@@ -514,10 +705,15 @@ def emit(perfumes):
             "name": display_name(p),
             "brand": p["brand"],
         }
+        # Both keys emit when both exist (plan S5, 2026-09-02): fid is the
+        # image key, url is the row's one collision-free identity — the future
+        # live-add findByUrl must see baked url rows even when a fid was
+        # attached (the Blaze duplicate-replay bug). Image precedence lives in
+        # server/images.js download(): seed-by-url -> fid CDN -> page scrape.
         if p.get("fid"):
             entry["fid"] = p["fid"]  # image: https://fimgs.net/mdimg/perfume/375x500.<fid>.jpg
-        elif p.get("url"):
-            entry["url"] = p["url"]  # image via og:image on this page, fetched server-side
+        if p.get("url"):
+            entry["url"] = p["url"]  # identity + og:image fallback, fetched server-side
         shards[p["id"] // SHARD_SIZE][str(p["id"])] = entry
     for shard_id, content in shards.items():
         with open(os.path.join(OUT, "notes", f"{shard_id}.json"), "w", encoding="utf-8") as f:
@@ -597,7 +793,7 @@ def main():
     n_sup = len(perfumes) - len(kept)
     if n_sup != len(PARFUMO_SUPERSEDED):
         # a listed row can be legitimately absent while the scripted-parfumo
-        # quarantine (build_dataset.QUARANTINE_SCRIPTED_PARFUMO) holds it out
+        # quarantine (build_dataset.SOURCE_TRUST "quarantined") holds it out
         print(f"parfumo superseded: {n_sup} of {len(PARFUMO_SUPERSEDED)} listed rows present "
               f"(rest quarantined upstream — see DATASET_NOTES.md)")
     else:

@@ -18,7 +18,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const norm = (s) => s.trim().toLowerCase(); // mirrors server/data.js norm
 const el = (id) => document.getElementById(id);
 
-const KINDS = [['chain', 'Department'], ['boutique', 'Niche'], ['flagship', 'Flagship']];
+const KINDS = [['chain', 'Chain Stores'], ['boutique', 'LA Boutiques'], ['flagship', 'Flagship Stores']];
 const KIND_LABEL = new Map(KINDS);
 const SORTS = [['pop', 'most popular'], ['rating', 'best rated'], ['year', 'newest']];
 // The three finder fields: each owns its own search box, typeahead dropdown,
@@ -172,10 +172,26 @@ function chip(kind, v, label) {
   return `<button type="button" class="chip" data-rm="${kind}" data-v="${esc(v)}">${label ?? esc(v)}</button>`;
 }
 
+// as_of arrives as "YYYY-MM"; shown as "Sep 2026".
+function asOfLabel(asOf) {
+  const m = /^(\d{4})-(\d{2})$/.exec(asOf || '');
+  if (!m) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[Number(m[2]) - 1] ?? ''} ${m[1]}`.trim();
+}
+
 function locationChipHtml() {
   const s = F.store && storeById.get(F.store);
   if (!s) return '';
-  return chip('store', s.id, esc(s.name)); // name only — the area would just echo the pick
+  let html = chip('store', s.id, esc(s.name)); // name only — the area would just echo the pick
+  // Chain stores are where "carried brands" and "on this shelf" drift apart
+  // most, so only they get the faint provenance line: which doors the brand
+  // list was read at, and when. Boutiques and flagships stay as they are.
+  if (s.kind === 'chain') {
+    const when = asOfLabel(s.as_of);
+    html += `<div class="store-note">Carried brands · ${esc(s.area)}${when ? ` · ${esc(when)}` : ''}</div>`;
+  }
+  return html;
 }
 
 // One chosen filter per line, joined by the word that says how they combine —
@@ -503,15 +519,19 @@ function renderTypeahead(field) {
 
   let html = '';
   if (field === 'location') {
-    // Grouped like the note/brand dropdowns: multi-brand LA shops first, then
-    // single-brand flagships. Area and kind still match a typed query even
-    // though the rows no longer display them.
-    const match = (s) => !t || norm(`${s.name} ${s.area} ${KIND_LABEL.get(s.kind) ?? s.kind}`).includes(t);
-    const list = stores.filter(match).slice(0, 12);
-    const laStores = list.filter((s) => s.kind !== 'flagship');
-    const flagships = list.filter((s) => s.kind === 'flagship');
-    if (laStores.length) html += '<div class="ta-head">LA Stores</div>' + laStores.map(storeRow).join('');
-    if (flagships.length) html += '<div class="ta-head">Flagship Stores</div>' + flagships.map(storeRow).join('');
+    // Grouped like the note/brand dropdowns: chain stores, then multi-brand LA
+    // boutiques, then single-brand flagships (the KINDS order). Area and kind
+    // still match a typed query even though the rows no longer display them;
+    // "department" is accepted as a synonym for the chain group. No row cap:
+    // the dropdown scrolls, and a cap would hide whole groups once the chains
+    // sit first in file order.
+    const kindWords = (s) => `${KIND_LABEL.get(s.kind) ?? s.kind}${s.kind === 'chain' ? ' department' : ''}`;
+    const match = (s) => !t || norm(`${s.name} ${s.area} ${kindWords(s)}`).includes(t);
+    const list = stores.filter(match);
+    for (const [kind, label] of KINDS) {
+      const rows = list.filter((s) => s.kind === kind);
+      if (rows.length) html += `<div class="ta-head">${label}</div>` + rows.map(storeRow).join('');
+    }
     if (!html) html = '<p class="sub no-results">No matching stores.</p>';
   } else {
     // I like / I avoid share one shape: notes then brands. Browse mode (empty

@@ -38,6 +38,13 @@ let searchIndexGz = null;
 
 export async function initData() {
   searchIndex = JSON.parse(await readFile(SEARCH_INDEX_PATH, 'utf8'));
+  // dedup.json suppressions: flag duplicate-variant rows (x:1) so the host
+  // search box can hide them. The ids stay valid — only search filters on x.
+  const dedup = JSON.parse(await readFile(path.join(OUT_DIR, 'dedup.json'), 'utf8'));
+  for (const idStr of Object.keys(dedup.suppress)) {
+    const entry = searchIndex[Number(idStr)]; // ids are array positions
+    if (entry) entry.x = 1;
+  }
   searchIndexGz = gzipSync(JSON.stringify(searchIndex));
 }
 
@@ -84,7 +91,7 @@ async function urlMap() {
 /** Search-index entry {i, n, b, y, s} for a source page URL already in the dataset, or null. */
 export async function findByUrl(url) {
   const id = (await urlMap()).get(urlKey(url));
-  return id == null ? null : (searchIndex.find((e) => e.i === id) ?? null);
+  return id == null ? null : (searchIndex[id] ?? null); // ids are array positions
 }
 
 const STRUCTURE_CHAR = { pyramid: 'p', flat: 'f', partial: 'x' };

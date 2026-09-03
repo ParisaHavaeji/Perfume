@@ -18,6 +18,7 @@ this file.)
 | Parfumo live adds | `raw/parfumo_new.jsonl` | scripted server fetch (feature removed) | **QUARANTINED** |
 | Parfumo verified re-entries | `raw/parfumo_verified.jsonl` | quarantined rows re-admitted after human check | trusted |
 | Scent Room / Malin+Goetz / Elorea | catalog jsonls | Shopify / brand-site crawls | trusted |
+| rdemarqui Fragrantica scrape | `raw/rdemarqui_perfumes.xlsx` | static GitHub dataset (plan S10) | **third-party scrape** |
 
 ## The Parfumo poisoning (the big one)
 
@@ -45,10 +46,17 @@ Consequences you must not forget:
 
 ### The quarantine (active)
 
-`QUARANTINE_SCRIPTED_PARFUMO = True` in `build_dataset.py` drops both
-scripted-parfumo sources (`parfumo_gap.jsonl`, `parfumo_new.jsonl`) whole at
-build time. This removed those perfumes from the game entirely — wrong notes
-in a note-guessing game are worse than absent perfumes.
+The quarantine now lives in `SOURCE_TRUST` in `build_dataset.py` (S6 of the
+remediation plan, 2026-09-02, replacing the earlier
+`QUARANTINE_SCRIPTED_PARFUMO` flag): every loader stamps its rows with the
+trust level of the raw file they came from, and one gate in `main()` drops
+every non-shippable row — before any merging, so a quarantined row can never
+claim a brand+name key and shadow a shippable source. Both scripted-parfumo
+sources (`parfumo_gap.jsonl`, `parfumo_new.jsonl`) are `quarantined` and drop
+whole at build time. This removed those perfumes from the game entirely —
+wrong notes in a note-guessing game are worse than absent perfumes.
+`verify.py` asserts the shipped trust levels are exactly
+{trusted, third-party-scrape, verified}.
 
 **Correction (2026-09-02, judge review):** the TidyTuesday rows are NOT
 "unaffected". ~4,000 of the csv's 59k rows carry known grade-1 decoys from the
@@ -176,40 +184,56 @@ against the current 66,423-row build; re-confirm any you rely on.
   removed; `data/image_seed/` untouched). Re-warm deliberately not run:
   on-demand fetch + the url-keyed seed cover it, and warm is pending the
   NO_WARM decision.
-- [ ] **S2. Filter suppressed variants out of the host search box.**
-  `public/game.js searchPerfumes` scans the raw search index; none of the
-  4,839 `dedup.json` suppressions apply there, so every known duplicate
-  variant shows in the dropdown — the most visible duplicate surface in the
-  product. Ship the suppress id-set alongside the index (or an `x:1` flag on
-  suppressed entries) and add one filter line. Highest payoff-per-line item
-  in this whole plan.
+- [x] **S2. Filter suppressed variants out of the host search box** — done
+  2026-09-02. `initData()` in `server/data.js` stamps `x: 1` on the 4,839
+  `dedup.json`-suppressed entries before gzipping the served index (disk file
+  untouched; ids are array positions so the stamp is O(suppress));
+  `searchPerfumes` in `public/game.js` skips `p.x` rows. Verified in-browser:
+  "1 Million (Eau de Toilette)" and "Santal Royal (Eau de Parfum)" no longer
+  appear in the dropdown while canonical rows and real flankers do.
 
-## Phase 2 — one batched pipeline rerun
+## Phase 2 — one batched pipeline rerun — DONE 2026-09-02 (Claude, all local, uncommitted)
 
 Batch S3–S7 into a single rebuild: every rerun renumbers ids and triggers the
 full flush/re-warm/seed checklist, so pay that cost once.
 
-- [ ] **S3. Expand `BRAND_KEY_ALIASES`** (currently 2 entries). ~79
+Outcome: 66,424 → **65,407** rows (alias-driven re-dedupe removed ~1,017 dup
+rows), dedup.json 4,839 → **5,946** suppressed (955 of them via the new tier-3
+prefix folds), verify **0 failures**, pipeline ×2 byte-identical. Canonical
+displays moved for the merged houses (e.g. "Zoologist" → "Zoologist
+Perfumes"); 7 ugly joint-name winners pinned via `BRAND_DISPLAY_OVERRIDES`.
+Deliberately NOT merged after hand review: orientica/orienticapremium and
+myperfumes/myperfumesselect (premium *lines* whose same-named products carry
+different juice). `seed_images.js` now reports 14 orphan seed files — the
+alias merge deduped away the rows carrying those urls; deleting them is
+Parisa's call.
+
+- [x] **S3. Expand `BRAND_KEY_ALIASES`** (currently 2 entries). ~79
   containment brand-key pairs share ≥3 identical perfume names ≈ ~1,200
   duplicate rows (j): alharamain/alharamainperfumes (129 shared names),
   iprofumidifirenze/spezierie… (66), rojadove/rojaparfums (60),
   miltonlloyd/… (58), afnan/afnanperfumes (56), jomalone/jomalonelondon (41),
   zoologist/zoologistperfumes (34), bykilian/kilian (27), … Generate the
   containment list mechanically, review by hand, add the approved pairs.
-- [ ] **S4. Line-prefix variant folding in `build_dedup`** — a new tier
+  *(done: 76 pairs added; build_stores.py lookups now route through the alias
+  map on BOTH sides — the canonical display can sit on either side of a merge)*
+- [x] **S4. Line-prefix variant folding in `build_dedup`** — a new tier
   alongside the format-suffix pass: same brand, one name-key a suffix of the
   other ("Armani Privé - Iris Céladon" vs "Iris Celadon", "Olfactories -
   Tainted Love" vs "Tainted Love"), gated on ≥80% note overlap. ~690 pairs
   (j) — the "Ch. 1 -" class, which no url/fid/exact-name key can see.
   **Soft-suppress only** (dedup.json), never hard-delete.
-- [ ] **S5. Dual-emit `fid` AND `url` in shards** (`clean_dataset.py:517`
+  *(done: token-suffix match so "Montrose" can't fold into "Rose"; 955 folds)*
+- [x] **S5. Dual-emit `fid` AND `url` in shards** (`clean_dataset.py:517`
   elif → both; ~6,356 rows affected, +2.7% shard size, verified safe for
   images/client (j)). Atomically with it: build `seed_images.js` liveKeys
   from every url-bearing entry regardless of fid (else the orphan report
   flags in-use seeds); document image precedence (seed-by-url → fid → page
   scrape) in `images.js download()`; and swap `data.js:87`'s O(n)
   `searchIndex.find` for `searchIndex[id]`.
-- [ ] **S6. Provenance dict in `build_dataset.py`:** `SOURCE_TRUST = {raw
+  *(done, incl. images.js precedence comment + page-scrape fallback for
+  dual-key entries whose fid fetch fails, and the data.js O(1) index swap)*
+- [x] **S6. Provenance dict in `build_dataset.py`:** `SOURCE_TRUST = {raw
   file → trusted | third-party-scrape | quarantined | verified}` mirroring
   the table at the top of this file (with TidyTuesday = third-party-scrape).
   Each loader stamps `p["trust"]`; one filter at the end of `main()` drops
@@ -218,33 +242,55 @@ full flush/re-warm/seed checklist, so pay that cost once.
   is where `PARFUMO_SUPERSEDED` logic can consolidate. Later, the
   `unionNotes`/decoy-scan predicates keyed on `source == "parfumo"` should
   key on trust instead.
-- [ ] **S7. New `verify.py` assertions:** urlKey uniqueness across all rows
+  *(done; the filter runs BEFORE the merge, not "at the end of main()" as
+  first written — filtering after would let a quarantined row claim a
+  brand+name key and shadow a shippable source)*
+- [x] **S7. New `verify.py` assertions:** urlKey uniqueness across all rows
   (the one enforceable identity invariant); the set of trust levels present
   in the build is exactly the shippable set; re-baseline the row-count and
   dedup-band thresholds after S3/S4 shift them; before/after canonical-brand
   diff in the rerun checklist (S3 + any merge can flip `unify_brands`
   most-common spellings).
-- [ ] **S8. Run the full plan.md rerun checklist** (pipeline ×2
+  *(done: urlKey unique over 18,739 url rows; trust set == shippable set;
+  size floor re-baselined to >64,000; dedup band 4,000–12,000 still holds at
+  5,946; brand diff reviewed — 76 keys folded, 0 spurious gains)*
+- [x] **S8. Run the full plan.md rerun checklist** (pipeline ×2
   byte-identical, verify green, flush cache, warm + seed, commit seed) and
   fix the README dataset counts (still quotes 71,772 / pre-quarantine
   numbers).
+  *(done: ×2 byte-identical, verify green, cache was already empty from S1 and
+  stays flushed; warm deliberately NOT run — no new url-source flagships, and
+  it's pending the NO_WARM decision; seed untouched (url-keyed) and the seed
+  commit is Parisa's; README counts now 65,407 / 1,801 flat / per-source
+  updated, and `build_stores.py` added to its rebuild snippet. Server restart
+  + deploy are Parisa's.)*
 
-## Phase 3 — blocked on Parisa's decisions
+## Phase 3 — run 2026-09-02 (S9 declined, S10 merged)
 
-- [ ] **S9. The $200 FragDB question — decide before any re-verification
-  work.** Yes → buy, run the standing decoy re-scan, build one merge lane;
-  the browser re-verification lane is deleted unbuilt. No → build the
-  re-verification lane per the protocol above, but pilot on ~30 rows first
-  to validate the "browser fetches are clean" hypothesis (it currently rests
-  on one manual fetch), and store retained HTML gzipped outside the deployed
-  tree (or add the path to `render.yaml` buildFilter).
-- [ ] **S10. rdemarqui xlsx merge last** (either branch). Before merging:
-  measure its fid/url recovery rate and relax `verify.py:30`
-  (every-perfume-has-an-image) to a floor (e.g. ≥95%), since its rows carry
-  neither; expect its "17.7k new" to shrink once S3's aliases fold spelling
-  variants; re-scan for new decoy tokens per the standing rule; and note it
-  shifts `notes_vocab.json` tier counts and any committed ML metrics, so
-  land it before the plan.md M1 baselines, not after.
+- [x] **S9. The $200 FragDB question** — decided NO 2026-09-02 (Parisa:
+  not paying for the dataset). The "No" branch's browser re-verification
+  lane (protocol above, ~30-row pilot first, keep gzipped HTML outside the
+  deployed tree) is now the open follow-up — it stays unbuilt until Parisa
+  asks for it; the ~689 quarantined gap-crawl rows stay out until then.
+- [x] **S10. rdemarqui xlsx merge — done 2026-09-02.** Downloaded
+  `perfume_database_cleaned.xlsx` into `raw/rdemarqui_perfumes.xlsx`
+  (36,969 rows; 36,966 usable). Pre-merge scans: decoy pool hits **0**;
+  unseen note tokens ~41, all real notes or obvious typos (4 typo synonyms
+  added: popocorn/oive leaf/narciussus/massioa); the xlsx holds literal
+  `\uXXXX` escapes in 48 note rows (decoded in the loader) and strips
+  punctuation/diacritics from brand names (14 display forms pinned in
+  `BRAND_DISPLAY_OVERRIDES` — "Malin+Goetz", "Kiehl's", … — after its 17.5k
+  rows flipped the most-common-spelling vote; casing-only flips like "Mad
+  et Len" kept as improvements). Loader `load_rdemarqui()` merges last;
+  notes title-cased at load so lowercase spellings can't flip canonical
+  display casing. "17.7k new" landed at 17,513 rows (65,407 → **82,920**);
+  attach_fids recovered fids for ~41% of them, leaving 10,319 image-less
+  rows (12.4%) — verify.py's image invariant is now a ≥85% coverage floor
+  plus "imageless ⇒ source rdemarqui" (the "e.g. ≥95%" guess was optimistic;
+  server 404s cleanly on no-image entries). Dedup grew 5,946 → 6,611 (in
+  band); verify 0 failures, pipeline ×2 byte-identical; cache/images
+  flushed (24 stale files). As predicted this shifts `notes_vocab.json`
+  tier counts — landed before any plan.md M1 baselines.
 
 ## Future live-add flow (whenever it returns)
 
@@ -264,7 +310,7 @@ Two guards, both required:
 Looked for already-crawled perfume datasets that could add to our 67,097. Nothing
 was merged; these are the findings and calls.
 
-## The one worth taking: rdemarqui's Fragrantica xlsx (~17.7k new, free)
+## The one worth taking: rdemarqui's Fragrantica xlsx (~17.7k new, free) — MERGED 2026-09-02 (plan S10 above)
 
 https://github.com/rdemarqui/perfume_recommender → `database/perfume_database_cleaned.xlsx`
 
@@ -313,3 +359,158 @@ that poisons unauthenticated fetches.
   scrape; needs a Kaggle login; her Parfumo set now 404s.
 - Assorted small Kaggle/HF sets (perfume-recommendation, candle fragrances) —
   tiny or off-topic.
+
+## Chain harvest recipe (SMELL LIST chain stores — feature-d amendment 4, started 2026-09-03)
+
+Chain/department stores enter `data/stores.json` through `brands_file: "chains/<id>.json"`, an object-form file
+`build_stores.py` validates (schema below). The list is what the retailer's own perfume department shows for a
+NAMED DOOR with the site's in-store availability filter ticked — brand-level near-inventory, read by a person in a
+real browser. Never a scraper script, never the retailer's JSON endpoint (typing a URL the site itself wrote, e.g.
+`?store=349&storeAvailability=349`, is reading a rendered page; constructing or replaying `/api/...` is not).
+Budget per chain per door: ≤5 navigations + ≤~10 hand-made filter toggles, ≥5 s apart, no loops. Never bypass a
+bot challenge or CAPTCHA, never log in, never type personal data (a zip in a public store locator is the only text
+typed). fragrantica.com is never touched, not even to cross-check a list. `ignore` is for house lines / sets only;
+every other retailer string stays in the file and either matches the dataset or is reported UNMATCHED — never
+hand-prune "non-perfume-looking" brands (Clinique, Kiehl's, L'Occitane all make perfume; the dataset decides).
+
+```json
+{"store": "<stores.json id>",
+ "method": "in_store_facet | grid_read | online_catalog | paste",
+ "locations": [
+   {"name": "<door name, verbatim from the site; clusters keep '& nearby'>", "store_id": "<site's numeric id>",
+    "cluster": false,
+    "urls": ["<every department URL read, with the site-written store params>"],
+    "facet": "<facet group → option used>", "shown": <brand count the facet displayed>,
+    "baseline_items": [<items before store filter>, <after>],
+    "reads": ["YYYY-MM-DD", ...],
+    "brands": ["<retailer strings exactly as rendered, ™/® included>"]}
+ ],
+ "aliases": {"<retailer string>": "<dataset brand>"},
+ "ignore": ["<house line or set name>"]}
+```
+Rules enforced by build_stores: `store` == entry id; `method` in the enum; every location has name/urls/reads;
+`as_of` is DERIVED as max(reads)[:7] (a chain entry must not carry its own); the entry's `area` must equal the
+location names joined by ` + ` (an optional trailing parenthetical such as "(website brand list)" is allowed for
+non-facet methods); aliases are 1→1 and an alias whose target does not resolve fails the build (ALIAS-MISS);
+match rate = matched distinct retailer strings / distinct strings after `ignore`, ≥60%. Post-visit corrections go
+in the stores.json entry's `brands_extra` / `brands_exclude` with a sibling `notes` map ("seen YYYY-MM-DD <door>"),
+never into the harvested file. Re-read a door when a visit finds ≥3 missing brands or after 6 months; compare the
+page's own item counts against `baseline_items` to tell "site changed" from "inventory changed".
+
+### Nordstrom (`nordstrom-la`) — method in_store_facet — VERIFIED 2026-09-03
+- Department pages: `/browse/beauty/fragrance/perfume` (site title "Women's Perfumes", but the brand facet carries
+  men's/unisex houses too — John Varvatos, MCM, Le Labo) and `/browse/men/grooming/cologne` ("Cologne for Men",
+  lives under Men, not Beauty). `/browse/beauty/fragrance/cologne` does NOT exist (404). Other fragrance
+  sub-departments (gift-sets, rollerball, body-hair-mist, bath-body) are not read.
+- Facet: rail group "Ready today" → checkbox `name="pick-up-today"` = THIS DOOR (URL gains
+  `store=<id>&storeAvailability=<id>`, page text "Pick up at The Grove"). `pick-up-tomorrow` is NOT door-level: it
+  switches to `postalCode=90015&postalCodeAvailability=90015` (zip-area availability, 1,899 items vs 659) — do not
+  use it for a door read. `same-day-delivery` irrelevant.
+- Store ids: The Grove = 349 (geo-default from zip 90015), Century City = 384 (The Americana at Brand = 340).
+  Chooser: the button whose text is the current store name (inside the "Ready today" rail region) opens "Set your
+  location" (dialog: zip box `#zipCode`, radios `#store-selection-<id>`, button "Set Your Location"); pick a radio,
+  press Set Your Location, the page reloads results for that door and keeps `pick-up-today` ticked.
+- Quirk: after a direct URL load or a store switch the checkbox can show ticked while the grid is still the
+  unfiltered 2,865 — untick and re-tick `pick-up-today`, wait ~7 s, and confirm the item count dropped before
+  reading the Brand facet. 2026-09-03 baselines: perfume 2,865 → 659 (Grove) / 672 (Century City); cologne
+  1,256 → 354 (Grove) / 295 (Century City). Brand facet sizes: Grove 77 + 48, Century City 82 + 49.
+- Brand facet: rail group "Brand" (button aria-label "Select Brand"), fully enumerated as checkboxes
+  `name="brand/<Retailer String>"` — 77 at The Grove women's perfume on 2026-09-03 (2,865 items → 659 with today).
+- Environment: the Browser pane renders non-composited (blank screenshots); facet controls were driven by DOM
+  `.click()` on the same checkbox a person taps; refs go stale on this SPA. Direct URLs with store params load the
+  page but do NOT tick the checkbox — tick it, then read.
+
+### Sephora (`sephora`) — method in_store_facet, CLUSTER — VERIFIED 2026-09-03 (real Chrome, not the pane)
+- Pages: `/shop/perfume` ("Perfume & Perfumes for Women", 1,010) and `/shop/cologne` ("Cologne for Men", 428).
+- The Browser pane cannot render Sephora's facet/grid (virtualized); the Claude-in-Chrome surface (a real,
+  composited Chrome window) can. A "Sign In" nag with browser-autofilled credentials pops a few seconds after
+  every page load and again after some clicks — close it with its X, never touch the fields.
+- Store: the header "Shop Store & Delivery" chooser and the "In Store: … ⌄" chevron both open "Choose a Store",
+  which turned into the Sign In modal on all three tries (anonymous visitors cannot change store). The
+  geo-default cluster was therefore kept: **USC VILLAGE & nearby, `filters[Pickup]=2072`** (a cluster; Sephora-
+  at-Kohl's doors count). A signed-in reader could re-do this for The Grove-area / Century City-area clusters.
+- Facet: the rail's Brand group shows 10 + "Show more"; "Show more" opens the full "Filter & Sort" dialog whose
+  Brand list is complete (85 perfume / 40 cologne unfiltered) — press "View A-Z" to sort. Tick the dialog's
+  `filters[Pickup]=2072` checkbox (URL gains `?ref=filters[Pickup]=2072`), wait ~6 s, confirm the count drops
+  (perfume 1,010 → 668, cologne 428 → 275), then read the Brand list again: 64 / 27 strings.
+- Aliases (7): Armani Beauty → Giorgio Armani, EILISH FRAGRANCES → Billie Eilish, KILIAN Paris → By Kilian,
+  Marc Jacobs Beauty → Marc Jacobs, NEST New York → Nest, Rare Beauty by Selena Gomez → Rare Beauty, World of
+  Chris Collins → Chris Collins. `ignore`: "Sephora Favorites" (a set line). 48 brands matched (75%). Unmatched
+  are absent from the dataset (Fenty, Huda, Gisou, Touchland, Summer Fridays, Nette, LoveShackFancy, …).
+
+### Bloomingdale's (`bloomingdales-la`) — method in_store_facet — VERIFIED 2026-09-03 (real Chrome)
+- The 2026-09-03 "Access Denied" was pane-specific; the real Chrome window loads the site with no challenge.
+- The perfume category (`/shop/makeup-perfume-beauty/luxury-perfume?id=1005889`, 1,794 → 1,816 items once a
+  store is set) has NO pickup facet (Brand, Gender, Sales & Offers, Item Type, Price, Fragrance Notes only).
+  The door read comes from the site's own Store Pickup listing instead: header "Your store" → "Change store"
+  → "Set Century City As My Store" (Century City = site id **363**; geo-default was Beverly Connection), then
+  the flyout's "Shop free store pickup" link → `/shop/pickup-delivery/Upc_bops_purchasable/<id>` ("Shopping at
+  Century City (20,998)"), Item Type facet → **Fragrance (776)**, then the Brand facet (fully enumerated with
+  counts, 70 strings, 755 items). Final URL
+  `/shop/pickup-delivery/Product_department,Upc_bops_purchasable/Fragrance,363?id=1132361&_additionalStoreLocations=363`.
+- Facet dropdowns (`button#facet_<NAME>`, panel `.facet-dropdown-cont`, list `.checkBoxesContainer`) are
+  internally scrolled; a scripted `.click()` on list text hit a mega-menu link once and navigated away — scroll
+  the list, then click the checkbox itself. Aliases (5): Armani → Giorgio Armani, Bond No. 9 New York → Bond
+  No 9, FERRAGAMO → Salvatore Ferragamo, ROJA → Roja Parfums, Sisley Paris → Sisley. 64 matched (93%).
+
+### Macy's (`macys`) — method in_store_facet — VERIFIED 2026-09-03 (real Chrome; same platform as Bloomingdale's)
+- Perfume category `/shop/beauty/fragrance/perfume?id=30087` has no pickup facet either. Same path: "Your
+  store" → "Change Store" (needs a real click; a DOM `.click()` did nothing) → "Set As My Store" on **Macy's
+  Beverly Center (id 5214)**, flyout "Shop Free Store Pickup" → `/shop/pickup-delivery/Upc_bops_purchasable/5214`
+  ("Shopping at Macy's Beverly Center (9,555)"). Item Type has no "Fragrance" — tick **Perfume** then
+  **Cologne** (URL `…/Perfume%7CCologne,5214…`), then read Brand: 26 strings, 66 items.
+- Quirk to watch: the Item Type facet advertised Perfume (253) / Cologne (160) before ticking but the ticked
+  listing reports 51 / 15. The pre-tick counts seem to include items that are not pickup-purchasable at this
+  door; the ticked listing is what the site stands behind. Beverly Center is a small Macy's — weak signal,
+  re-read after a visit. Alias: Armani → Giorgio Armani. 26 matched (100%); list is mass-market heavy
+  (Kylie Cosmetics, philosophy, KIKO Milano, Juicy Couture…).
+
+### Ulta Beauty (`ulta`) — method in_store_facet, two doors — VERIFIED 2026-09-03 (real Chrome)
+- Pages: `/shop/fragrance/womens-fragrance/perfume` (1,122) and `/shop/men/cologne` (636; the
+  `/shop/fragrance/mens-fragrance/cologne` link redirects here and drops any `storeId`). The listing sits below
+  a "We think you'll like" carousel — scroll before concluding the grid failed to load (it did load; the pane
+  showed only the carousel and its accessibility tree crashes on a malformed price `label[for]`).
+- Door filter: toolbar **"In Store"** toggle (`button.StoreFilter`, `aria-pressed`) → URL gains `?storeId=<id>`
+  and the count buckets ("1100+ results" → "400+ results"). Store chooser = the "at <store> ⌄" text beside it →
+  "Select Store" drawer → zip **90048** → radio → Continue (one press reloads the listing; the drawer sometimes
+  re-renders empty — press the search arrow again). Geo-default was Azalea Regional Shopping Center (686).
+  Doors read: **West Hollywood Gateway = 156**, **Westwood Village = 1315**.
+- Brand facet: "Show filters (n)" drawer → Brand accordion → "See N more" (the DOM keeps the full list even
+  while the drawer is closed; the accordion's leaf texts minus "N Products Available" are the strings).
+  WeHo 79 perfume / 33 cologne strings; Westwood 77 / 31. Aliases (8): ARMANI → Giorgio Armani, Balmain Paris
+  → Balmain, Beyoncé Parfums → Beyonce, DKNY → Donna Karan, Kate Spade New York → Kate Spade, Nemat → Nemat
+  International, NEST New York → Nest, Paris Hilton Fragrances → Paris Hilton. 63 matched (74%); unmatched are
+  celebrity/mass lines absent from the dataset (Ice Spice, Megan Thee Stallion, Khloé Kardashian, Snif-era
+  indies, hair-care houses).
+
+### Saks Fifth Avenue (`saks-bh`) — method online_catalog — READ 2026-09-03 (Browser pane, plain DOM)
+- `saksfifthavenue.com` category pages have **no in-store availability facet at all** (rail = Category,
+  Designer, Price, Type, Sale, Scent, New, Promotion; BOPIS is per-product), so a door-level read is impossible
+  and the entry is the website brand list — `area: "Beverly Hills (website brand list)"` per the amendment.
+- Pages: `/c/beauty/view-all-beauty/fragrance` ("Women's Designer Fragrance", 2,856; also carries candles,
+  diffusers and body care, so home-fragrance houses appear) and `/c/men/grooming-cologne/cologne` (1,177).
+  Designer facet (`fieldset.refinement-id-brand`) is fully enumerated with counts: 123 / 100 strings.
+- Aliases (12): ARMANI BEAUTY → Giorgio Armani, Bohoboco Perfume → Bohoboco, Bond No.9 New York → Bond No 9,
+  Casamorati → Casamorati 1888, Floris London → Floris, Houbigant Paris → Houbigant, LOEWE Perfumes → Loewe,
+  NEST New York → Nest, Orientica Parfums → Orientica, ROJA → Roja Parfums, Shalini Parfum → Shalini,
+  Sisley-Paris → Sisley. 97 matched (80%). If Saks ever adds a store facet (Saks Global now owns Neiman, whose
+  site has one), switch this entry to `in_store_facet`.
+
+### Neiman Marcus (`neiman-marcus-bh`) — method in_store_facet — VERIFIED 2026-09-03
+- Fragrance department = ONE page: `/c/beauty-fragrance-perfume-cat10470746` ("Women's Designer Perfume
+  Collection", 2,814 items); the site's "Cologne Fragrance" / "Eau de Toilette" links all point to the same
+  category, so there is no separate men's page. Category ids guessed from memory redirect to unrelated
+  categories (shoes, women's clothing) — always enter via the Beauty nav (`/c/beauty-cat000285` →
+  `/c/beauty-all-beauty-cat55180733` → Fragrance `/c/beauty-fragrance-cat10470744` → Perfume).
+- Facets live in a drawer behind the "FILTER" button (text "FILTER BY:" while open) and apply only on "DONE".
+  Group "Get It Fast" → "Store Pickup at Beverly Hills: Today (order by 12pm)" = checkbox `value="csp"` (the
+  store is the header's preselected door; "sdd"/"ndd" are shipping options). After DONE the URL carries
+  `?get-it-fast=%7C10%7C%7C` (10 = Beverly Hills). Group "Designer" is fully enumerated with per-designer counts
+  (`Name(n)` lines); 62 designers / 1,120 items under the pickup filter on 2026-09-03 (Acqua di Parma 48,
+  TOM FORD 90, CREED 69, GUERLAIN 64, Jo Malone London 66, MFK 66, Parfums de Marly 56…).
+- Aliases used (9): ARMANI beauty → Giorgio Armani, Bond No.9 New York → Bond No 9, Casamorati → Casamorati
+  1888, Houbigant Paris → Houbigant, NEST New York → Nest, Orientica Parfums → Orientica, ROJA → Roja Parfums,
+  Sisley Paris → Sisley, Yves Saint Laurent Beaute → Yves Saint Laurent. Absent from the dataset: Aman,
+  Brunello Cucinelli, Clé de Peau Beauté, U Beauty, Victoria Beckham. Note: the dataset still splits
+  `Roja Parfums` / `Roja Dove` — a fold candidate for the next designer-house pass.
+- No bot challenge; the pane's non-composited rendering did not matter here (facets are plain DOM).

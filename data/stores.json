@@ -3,57 +3,50 @@
     "id": "sephora",
     "name": "Sephora",
     "kind": "chain",
-    "area": "many LA locations",
-    "as_of": "2026-08",
-    "brands": []
+    "area": "USC Village & nearby",
+    "brands_file": "chains/sephora.json"
   },
   {
     "id": "ulta",
     "name": "Ulta Beauty",
     "kind": "chain",
-    "area": "many LA locations",
-    "as_of": "2026-08",
-    "brands": []
+    "area": "West Hollywood Gateway + Westwood Village",
+    "brands_file": "chains/ulta.json"
   },
   {
     "id": "nordstrom-la",
     "name": "Nordstrom",
     "kind": "chain",
     "area": "The Grove + Century City",
-    "as_of": "2026-08",
-    "brands": []
+    "brands_file": "chains/nordstrom-la.json"
   },
   {
     "id": "bloomingdales-la",
     "name": "Bloomingdale's",
     "kind": "chain",
     "area": "Century City",
-    "as_of": "2026-08",
-    "brands": []
+    "brands_file": "chains/bloomingdales-la.json"
   },
   {
     "id": "macys",
     "name": "Macy's",
     "kind": "chain",
-    "area": "many LA locations",
-    "as_of": "2026-08",
-    "brands": []
+    "area": "Beverly Center",
+    "brands_file": "chains/macys.json"
   },
   {
     "id": "neiman-marcus-bh",
     "name": "Neiman Marcus",
     "kind": "chain",
     "area": "Beverly Hills",
-    "as_of": "2026-08",
-    "brands": []
+    "brands_file": "chains/neiman-marcus-bh.json"
   },
   {
     "id": "saks-bh",
     "name": "Saks Fifth Avenue",
     "kind": "chain",
-    "area": "Beverly Hills",
-    "as_of": "2026-08",
-    "brands": []
+    "area": "Beverly Hills (website brand list)",
+    "brands_file": "chains/saks-bh.json"
   },
   {
     "id": "scentbar-la",
@@ -78,24 +71,74 @@
     "area": "N Beverly Dr, Beverly Hills",
     "as_of": "2026-08",
     "brands": [
-      "A Lab On Fire", "Ajmal", "Alchimista", "Amouage", "Atelier Cologne",
-      "Atelier des Ors", "BDK Parfums", "Boadicea the Victorious", "Boka",
-      "Carner Barcelona", "Caron", "Casamorati 1888", "Cirque du Soleil",
-      "City Rhythm", "Clive Christian", "By Shaik", "Eight & Bob",
-      "Electimuss", "Escentric Molecules", "Etat Libre d'Orange",
-      "Fragrance du Bois", "Franck Boclet", "Frapin", "Fugazzi",
-      "Goldfield & Banks", "Goutal", "Hermetica", "Histoires de Parfums",
-      "Houbigant", "House of Matriarch", "Initio Parfums Prives",
-      "Jean Patou", "Jeroboam", "Juliette Has a Gun", "Jusbox",
-      "Kemi / Al Kimiya", "Kristiansand New York",
-      "La Cristallerie Des Parfums", "LEN Fragrance", "Liquides Imaginaires",
-      "Maison Solis", "M. Micallef", "Mancera", "Marc-Antoine Barrois",
-      "Memo Paris", "Mind Games", "Montale", "Modern Mark", "Nasomatto",
-      "Navitus Parfums", "New Notes", "Nishane", "Ormonde Jayne",
-      "Orto Parisi", "Parfums de Marly", "Parfums de Nicolai",
-      "Perris Monte Carlo", "Rania J", "Roja Parfums", "Royal Crown",
-      "SBOY by Draco", "Sospiro", "Thameen", "Tiziana Terenzi",
-      "Unique'e Luxury", "Veronique Gabai", "Vivamor Parfums", "Xerjoff"
+      "A Lab On Fire",
+      "Ajmal",
+      "Alchimista",
+      "Amouage",
+      "Atelier Cologne",
+      "Atelier des Ors",
+      "BDK Parfums",
+      "Boadicea the Victorious",
+      "Boka",
+      "Carner Barcelona",
+      "Caron",
+      "Casamorati 1888",
+      "Cirque du Soleil",
+      "City Rhythm",
+      "Clive Christian",
+      "By Shaik",
+      "Eight & Bob",
+      "Electimuss",
+      "Escentric Molecules",
+      "Etat Libre d'Orange",
+      "Fragrance du Bois",
+      "Franck Boclet",
+      "Frapin",
+      "Fugazzi",
+      "Goldfield & Banks",
+      "Goutal",
+      "Hermetica",
+      "Histoires de Parfums",
+      "Houbigant",
+      "House of Matriarch",
+      "Initio Parfums Prives",
+      "Jean Patou",
+      "Jeroboam",
+      "Juliette Has a Gun",
+      "Jusbox",
+      "Kemi / Al Kimiya",
+      "Kristiansand New York",
+      "La Cristallerie Des Parfums",
+      "LEN Fragrance",
+      "Liquides Imaginaires",
+      "Maison Solis",
+      "M. Micallef",
+      "Mancera",
+      "Marc-Antoine Barrois",
+      "Memo Paris",
+      "Mind Games",
+      "Montale",
+      "Modern Mark",
+      "Nasomatto",
+      "Navitus Parfums",
+      "New Notes",
+      "Nishane",
+      "Ormonde Jayne",
+      "Orto Parisi",
+      "Parfums de Marly",
+      "Parfums de Nicolai",
+      "Perris Monte Carlo",
+      "Rania J",
+      "Roja Parfums",
+      "Royal Crown",
+      "SBOY by Draco",
+      "Sospiro",
+      "Thameen",
+      "Tiziana Terenzi",
+      "Unique'e Luxury",
+      "Veronique Gabai",
+      "Vivamor Parfums",
+      "Xerjoff"
     ]
   },
   {
@@ -112,7 +155,9 @@
     "kind": "flagship",
     "area": "5 LA boutiques",
     "as_of": "2026-08",
-    "brands": ["Le Labo"]
+    "brands": [
+      "Le Labo"
+    ]
   },
   {
     "id": "ds-durga",
@@ -120,7 +165,9 @@
     "kind": "flagship",
     "area": "Abbot Kinney + Silver Lake",
     "as_of": "2026-08",
-    "brands": ["D.S. & Durga"]
+    "brands": [
+      "D.S. & Durga"
+    ]
   },
   {
     "id": "santa-maria-novella",
@@ -128,7 +175,9 @@
     "kind": "flagship",
     "area": "Melrose Pl",
     "as_of": "2026-08",
-    "brands": ["Santa Maria Novella"]
+    "brands": [
+      "Santa Maria Novella"
+    ]
   },
   {
     "id": "dries-van-noten",
@@ -136,7 +185,9 @@
     "kind": "flagship",
     "area": "La Cienega",
     "as_of": "2026-08",
-    "brands": ["Dries Van Noten"]
+    "brands": [
+      "Dries Van Noten"
+    ]
   },
   {
     "id": "malin-goetz",
@@ -144,7 +195,9 @@
     "kind": "flagship",
     "area": "Larchmont Village",
     "as_of": "2026-08",
-    "brands": ["Malin+Goetz"]
+    "brands": [
+      "Malin+Goetz"
+    ]
   },
   {
     "id": "diptyque",
@@ -152,7 +205,9 @@
     "kind": "flagship",
     "area": "Larchmont + The Grove + Beverly Hills + Palisades",
     "as_of": "2026-08",
-    "brands": ["Diptyque"]
+    "brands": [
+      "Diptyque"
+    ]
   },
   {
     "id": "byredo",
@@ -160,7 +215,9 @@
     "kind": "flagship",
     "area": "Melrose Ave, West Hollywood",
     "as_of": "2026-08",
-    "brands": ["Byredo"]
+    "brands": [
+      "Byredo"
+    ]
   },
   {
     "id": "frederic-malle",
@@ -168,7 +225,9 @@
     "kind": "flagship",
     "area": "Melrose Pl",
     "as_of": "2026-08",
-    "brands": ["Frédéric Malle"]
+    "brands": [
+      "Frédéric Malle"
+    ]
   },
   {
     "id": "elorea",
@@ -176,6 +235,8 @@
     "kind": "flagship",
     "area": "Chapman Plaza, Koreatown",
     "as_of": "2026-08",
-    "brands": ["Elorea"]
+    "brands": [
+      "Elorea"
+    ]
   }
 ]

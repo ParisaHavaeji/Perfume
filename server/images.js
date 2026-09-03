@@ -117,37 +117,8 @@ function findPageImage(html) {
   return null;
 }
 
-async function download(id, entry) {
-  if (entry.url) {
-    const key = urlSeedKey(entry.url);
-    const ext = seedExt.get(key);
-    if (ext) {
-      try {
-        await copyFile(path.join(SEED_DIR, `${key}${ext}`), path.join(CACHE_DIR, `${id}${ext}`));
-        return ext;
-      } catch {
-        // seed file unreadable — fall through to the network path
-      }
-    }
-  }
-  const candidates = [];
-  if (entry.fid != null) {
-    candidates.push(`https://fimgs.net/mdimg/perfume/375x500.${entry.fid}.jpg`);
-  } else if (entry.url) {
-    const page = await fetchWithTimeout(entry.url, 'text/html');
-    const found = findPageImage(await page.text());
-    if (!found) throw new Error(`no page image at ${entry.url}`);
-    const src = new URL(found, entry.url).href;
-    // Parfumo's og:image is a watermarked 1200x630 social card; the same photo
-    // is served clean under /perfumes/. Prefer it, fall back to the card.
-    if (src.includes('/perfume_social/')) {
-      candidates.push(src.replace('/perfume_social/', '/perfumes/').split('?')[0]);
-    }
-    candidates.push(src);
-  } else {
-    throw new Error('entry has neither fid nor url');
-  }
-
+/** Fetch each candidate image URL in turn; cache and return the ext of the first good one. */
+async function fetchCandidates(id, candidates) {
   let lastError;
   for (const imageSrc of candidates) {
     try {
@@ -164,6 +135,49 @@ async function download(id, entry) {
     }
   }
   throw lastError;
+}
+
+// Image precedence (plan S5; shards can carry BOTH fid and url since the
+// dual-emit change): committed seed by url (local copy, no network) -> fid CDN
+// fetch (one plain fimgs.net request) -> source-page og:image/JSON-LD scrape
+// (the expensive path, and the only one for url-only entries).
+async function download(id, entry) {
+  if (entry.url) {
+    const key = urlSeedKey(entry.url);
+    const ext = seedExt.get(key);
+    if (ext) {
+      try {
+        await copyFile(path.join(SEED_DIR, `${key}${ext}`), path.join(CACHE_DIR, `${id}${ext}`));
+        return ext;
+      } catch {
+        // seed file unreadable — fall through to the network path
+      }
+    }
+  }
+  if (entry.fid == null && !entry.url) throw new Error('entry has neither fid nor url');
+
+  let fidError;
+  if (entry.fid != null) {
+    try {
+      return await fetchCandidates(id, [`https://fimgs.net/mdimg/perfume/375x500.${entry.fid}.jpg`]);
+    } catch (err) {
+      fidError = err; // dual-key entries still have the page scrape below
+    }
+  }
+  if (!entry.url) throw fidError;
+
+  const page = await fetchWithTimeout(entry.url, 'text/html');
+  const found = findPageImage(await page.text());
+  if (!found) throw fidError ?? new Error(`no page image at ${entry.url}`);
+  const src = new URL(found, entry.url).href;
+  const candidates = [];
+  // Parfumo's og:image is a watermarked 1200x630 social card; the same photo
+  // is served clean under /perfumes/. Prefer it, fall back to the card.
+  if (src.includes('/perfume_social/')) {
+    candidates.push(src.replace('/perfume_social/', '/perfumes/').split('?')[0]);
+  }
+  candidates.push(src);
+  return fetchCandidates(id, candidates);
 }
 
 /**

@@ -1,0 +1,108 @@
+{
+ "store": "bloomingdales-la",
+ "method": "in_store_facet",
+ "locations": [
+  {
+   "name": "Century City",
+   "store_id": "363",
+   "cluster": false,
+   "urls": [
+    "https://www.bloomingdales.com/shop/pickup-delivery/Product_department,Upc_bops_purchasable/Fragrance,363?id=1132361&_additionalStoreLocations=363"
+   ],
+   "facet": "Header 'Your store' → Change store → Set Century City As My Store; flyout link 'Shop free store pickup' → /shop/pickup-delivery/Upc_bops_purchasable/363 ('Shopping at Century City'); Item Type facet → Fragrance; Brand facet read (fully enumerated, per-brand counts). The perfume category page itself has no pickup facet.",
+   "shown": {
+    "fragrance": 70
+   },
+   "baseline_items": {
+    "fragrance": [
+     20998,
+     755
+    ],
+    "note": "20,998 = all pickup items at Century City before the Item Type filter; 755 = Fragrance. Online perfume category /shop/makeup-perfume-beauty/luxury-perfume?id=1005889 showed 1,794 → 1,816 items after the store switch."
+   },
+   "reads": [
+    "2026-09-03"
+   ],
+   "brands": [
+    "Acqua di Parma",
+    "AERIN",
+    "Armani",
+    "Balmain Beauty",
+    "Bond No. 9 New York",
+    "Brunello Cucinelli",
+    "Burberry",
+    "BVLGARI",
+    "BYREDO",
+    "Carolina Herrera",
+    "Cartier",
+    "CHANEL",
+    "Chloé",
+    "Christian Louboutin",
+    "Clinique",
+    "COACH",
+    "Costa Brazil",
+    "CREED",
+    "DIOR",
+    "DIPTYQUE",
+    "Dolce & Gabbana",
+    "Donna Karan",
+    "DS & DURGA",
+    "Estée Lauder",
+    "EX NIHILO",
+    "FERRAGAMO",
+    "Floral Street",
+    "Givenchy",
+    "Gucci",
+    "Guerlain",
+    "HERMÈS",
+    "Initio Parfums Privés",
+    "Jean Paul Gaultier",
+    "Jil Sander",
+    "Jimmy Choo",
+    "Jo Malone London",
+    "John Varvatos",
+    "La Prairie",
+    "Lancôme",
+    "Laura Mercier",
+    "Maison Francis Kurkdjian",
+    "Maison Margiela",
+    "MALIN and GOETZ",
+    "Mancera",
+    "MARC JACOBS",
+    "MIND GAMES",
+    "Miu Miu",
+    "Montale",
+    "Montblanc",
+    "Moroccanoil",
+    "NEURAÉ",
+    "Parfums de Marly",
+    "Penhaligon's",
+    "Perfumehead",
+    "Prada",
+    "Rabanne",
+    "Ralph Lauren",
+    "Roberto Cavalli",
+    "ROJA",
+    "Salvatore Ferragamo",
+    "Sisley Paris",
+    "Tiffany & Co.",
+    "Tom Ford",
+    "U Beauty",
+    "Valentino",
+    "Van Cleef & Arpels",
+    "Versace",
+    "Viktor&Rolf",
+    "XERJOFF",
+    "Yves Saint Laurent"
+   ]
+  }
+ ],
+ "aliases": {
+  "Armani": "Giorgio Armani",
+  "Bond No. 9 New York": "Bond No 9",
+  "FERRAGAMO": "Salvatore Ferragamo",
+  "ROJA": "Roja Parfums",
+  "Sisley Paris": "Sisley"
+ },
+ "ignore": []
+}

@@ -1,0 +1,104 @@
+{
+ "store": "neiman-marcus-bh",
+ "method": "in_store_facet",
+ "locations": [
+  {
+   "name": "Beverly Hills",
+   "store_id": "10",
+   "cluster": false,
+   "urls": [
+    "https://www.neimanmarcus.com/c/beauty-fragrance-perfume-cat10470746?get-it-fast=%7C10%7C%7C"
+   ],
+   "facet": "FILTER → Get It Fast → Store Pickup at Beverly Hills: Today (order by 12pm) [csp] → DONE; Designer facet",
+   "shown": {
+    "perfume": 62
+   },
+   "baseline_items": {
+    "perfume": [
+     2814,
+     1120
+    ],
+    "note": "1,120 = sum of Designer facet counts under the pickup filter (the header count was not captured); Neiman has no separate cologne category — the perfume page is the whole fragrance department"
+   },
+   "reads": [
+    "2026-09-03"
+   ],
+   "brands": [
+    "Acqua di Parma",
+    "ALEXANDRE.J",
+    "Aman",
+    "Amouage",
+    "ARMANI beauty",
+    "Balmain Beauty",
+    "Boadicea the Victorious",
+    "Bond No.9 New York",
+    "Brunello Cucinelli",
+    "BVLGARI",
+    "Byredo",
+    "Cartier",
+    "Casamorati",
+    "Chantecaille",
+    "Clive Christian",
+    "Clé de Peau Beauté",
+    "Courreges",
+    "CREED",
+    "D.S. & DURGA",
+    "Dior",
+    "Editions de Parfums Frederic Malle",
+    "Ex Nihilo",
+    "Fragrance Du Bois",
+    "Giorgio Armani",
+    "Givenchy",
+    "GUERLAIN",
+    "HERMÈS",
+    "Houbigant Paris",
+    "Initio Parfums Privés",
+    "Jo Malone London",
+    "Kilian",
+    "L'Artisan Parfumeur",
+    "Liquides Imaginaires",
+    "LOEWE",
+    "Maison Crivelli",
+    "Maison Francis Kurkdjian",
+    "Mancera",
+    "MARC-ANTOINE BARROIS",
+    "MASQUE MILANO",
+    "Matiere Premiere",
+    "Memo Paris",
+    "MIND GAMES",
+    "Molton Brown",
+    "Montale",
+    "NEST New York",
+    "Nishane",
+    "Orientica Parfums",
+    "Orlane",
+    "Parfums de Marly",
+    "Penhaligon's",
+    "ROJA",
+    "Sisley Paris",
+    "The Harmonist",
+    "Tiziana Terenzi",
+    "TOM FORD",
+    "Trudon",
+    "U Beauty",
+    "Van Cleef & Arpels",
+    "Victoria Beckham",
+    "Vilhelm Parfumerie",
+    "Xerjoff",
+    "Yves Saint Laurent Beaute"
+   ]
+  }
+ ],
+ "aliases": {
+  "ARMANI beauty": "Giorgio Armani",
+  "Bond No.9 New York": "Bond No 9",
+  "Casamorati": "Casamorati 1888",
+  "Houbigant Paris": "Houbigant",
+  "NEST New York": "Nest",
+  "Orientica Parfums": "Orientica",
+  "ROJA": "Roja Parfums",
+  "Sisley Paris": "Sisley",
+  "Yves Saint Laurent Beaute": "Yves Saint Laurent"
+ },
+ "ignore": []
+}

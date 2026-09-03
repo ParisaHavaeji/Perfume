@@ -1,0 +1,60 @@
+{
+ "store": "macys",
+ "method": "in_store_facet",
+ "locations": [
+  {
+   "name": "Beverly Center",
+   "store_id": "5214",
+   "cluster": false,
+   "urls": [
+    "https://www.macys.com/shop/pickup-delivery/Product_department,Upc_bops_purchasable/Perfume%7CCologne,5214?id=320264&_additionalStoreLocations=5214"
+   ],
+   "facet": "Header 'Your store' → Change Store → 'Set As My Store' on Macy's Beverly Center; flyout link 'Shop Free Store Pickup' → /shop/pickup-delivery/Upc_bops_purchasable/5214 ('Shopping at Macy's Beverly Center'); Item Type facet → Perfume + Cologne (no single Fragrance option); Brand facet read.",
+   "shown": {
+    "perfume+cologne": 26
+   },
+   "baseline_items": {
+    "all_pickup": [
+     9555,
+     66
+    ],
+    "note": "Item Type facet advertised Perfume (253) / Cologne (160) before ticking but the filtered listing reports 51 / 15 (66 total) — the pre-tick counts appear to include items not actually pickup-purchasable at this door. Small door: treat as a weak signal and re-read."
+   },
+   "reads": [
+    "2026-09-03"
+   ],
+   "brands": [
+    "Armani",
+    "Burberry",
+    "Carolina Herrera",
+    "CHANEL",
+    "Chloe",
+    "Clarins",
+    "DIOR",
+    "Dolce&Gabbana",
+    "Estée Lauder",
+    "Givenchy",
+    "Issey Miyake",
+    "Jean Paul Gaultier",
+    "Jimmy Choo",
+    "Juicy Couture",
+    "KIKO Milano",
+    "Kylie Cosmetics",
+    "Lancôme",
+    "Marc Jacobs",
+    "Michael Kors",
+    "Montblanc",
+    "Narciso Rodriguez",
+    "Origins",
+    "philosophy",
+    "Versace",
+    "Viktor & Rolf",
+    "Yves Saint Laurent"
+   ]
+  }
+ ],
+ "aliases": {
+  "Armani": "Giorgio Armani"
+ },
+ "ignore": []
+}
